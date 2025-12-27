@@ -121,7 +121,10 @@ def render_error(error_message, project_name=None):
 @app.route('/<projectname>/static/<filepath:path>')
 def serve_project_static(projectname, filepath):
     return static_file(filepath, root='./static')
-
+# robots.txt 요청을 처리하는 라우트 추가
+@app.route('/robots.txt')
+def robots():
+    return static_file('robots.txt', root='./static')
 # 파비콘 요청을 처리하는 라우트 추가
 @app.route('/favicon.ico')
 def favicon():
@@ -193,6 +196,24 @@ def project_leaderboard(projectname):
         timeframe = request.query.get('timeframe', 'TOTAL')
         timestamp1 = request.query.get('timestamp1', '')
         timestamp2 = request.query.get('timestamp2', '')
+        
+        # ⭐ [수정] metric 파라미터 추가 및 기본값 'snapsPercent' 설정 ⭐
+        metric = request.query.get('metric', 'snapsPercent') 
+        _col_metric = ""
+        # ⭐⭐⭐ 1. 컬럼 변수 정의를 여기로 옮깁니다. ⭐⭐⭐
+        if metric == 'cSnapsPercent':
+            metric_display_name = "c마쉐"
+            mindshare_change_col = 'c_mindshare_change' 
+            prev_mindshare_col = 'prev_c_mindshare'
+            curr_mindshare_col = 'curr_c_mindshare'
+            _col_metric="c"
+        else:
+            # 기본값 'snapsPercent'
+            metric_display_name = "마쉐" 
+            mindshare_change_col = 'mindshare_change'
+            prev_mindshare_col = 'prev_mindshare'
+            curr_mindshare_col = 'curr_mindshare'
+        # ⭐⭐⭐ 컬럼 변수 정의 끝 ⭐⭐⭐
         # 사용 가능한 타임스탬프 목록
         timestamps = dp.get_available_timestamps(timeframe)
         
@@ -207,20 +228,20 @@ def project_leaderboard(projectname):
         compare_data = pd.DataFrame()
         
         if timestamp1 and timestamp2:
-            compare_data = dp.compare_leaderboards(timestamp1, timestamp2, timeframe)
-        
+            # ⭐ 수정: metric 파라미터 전달 ⭐
+            compare_data = dp.compare_leaderboards(timestamp1, timestamp2, timeframe, metric)
         # 데이터 테이블을 HTML로 변환
         if not compare_data.empty:
             # 변화량에 화살표 추가하고 스타일 적용
             compare_data['rank_change_display'] = compare_data['rank_change'].apply(
                 lambda x: f"{x}" if x > 0 else (f"{x}" )
             )
-            compare_data['mindshare_change_display'] = compare_data['mindshare_change'].apply(
+            compare_data['mindshare_change_display'] = compare_data[mindshare_change_col].apply( 
                 lambda x: f"{x:.4f}" if x > 0 else (f"{x:.4f}" )
             )
             
             # HTML 테이블 생성
-            table_html = """
+            table_html = f"""
             <table id="leaderboardTable" class="table table-striped table-hover">
                 <thead>
                     <tr>
@@ -228,9 +249,9 @@ def project_leaderboard(projectname):
                         <th>이전 순위</th>
                         <th>현재 순위</th>
                         <th>순위 변화</th>
-                        <th>이전 마쉐</th>
-                        <th>현재 마쉐</th>
-                        <th>마쉐 변화</th>
+                        <th>이전 {_col_metric}마쉐</th>
+                        <th>현재 {_col_metric}마쉐</th>
+                        <th>{_col_metric}마쉐 변화</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -239,28 +260,37 @@ def project_leaderboard(projectname):
             for i, row in enumerate(compare_data.itertuples(), 1):
                 # 순위 변화에 따른 스타일 설정
                 rank_change_class = "text-success" if row.rank_change > 0 else ("text-danger" if row.rank_change < 0 else "")
-                mindshare_change_class = "text-success" if row.mindshare_change > 0 else ("text-danger" if row.mindshare_change < 0 else "")
+                mindshare_change_value = getattr(row, mindshare_change_col)
+                mindshare_change_class = "text-success" if mindshare_change_value > 0 else ("text-danger" if mindshare_change_value < 0 else "")
             
-
+                # ⭐⭐⭐ [핵심 수정] 이전/현재 마쉐 값을 동적으로 참조하여 변수 정의 (추가/복구) ⭐⭐⭐
+                prev_mindshare_value = getattr(row, prev_mindshare_col)
+                curr_mindshare_value = getattr(row, curr_mindshare_col)
+                # ⭐⭐⭐ 수정/복구 끝 ⭐⭐⭐
                 table_html += f"""
-                <tr>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <img src="{row.profileImageUrl}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;">
-                            <div>
-                                <strong>{row.displayName}</strong><br>
-                                <small class="text-muted">@{row.username}</small><a href="/{projectname}/user/{row.username}" class="user-link" title="유저 분석">🔍</a>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="{row.profileImageUrl}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;">
+                                <div>
+                                    <strong>{row.displayName}</strong><br>
+                                    <small class="text-muted">@{row.username}</small><a href="/{projectname}/user/{row.username}" class="user-link" title="유저 분석">🔍</a>
+                                </div>
                             </div>
-                        </div>
-                    </td>
-                    <td>{row.prev_rank}</td>
-                    <td>{row.curr_rank}</td>
-                    <td class="{rank_change_class}">{row.rank_change_display}</td>
-                    <td>{row.prev_mindshare:.4f}</td>
-                    <td>{row.curr_mindshare:.4f}</td>
-                    <td class="{mindshare_change_class}">{row.mindshare_change_display}</td>
-                </tr>
-                """
+                        </td>
+                        <td>{row.prev_rank}</td>
+                        <td>{row.curr_rank}</td>
+                        <td class="{rank_change_class}">{row.rank_change_display}</td>
+                        <td>{prev_mindshare_value:.4f}</td>
+                        <td>{curr_mindshare_value:.4f}</td>
+                        <td class="{mindshare_change_class}">{row.mindshare_change_display}</td>
+                    </tr>
+                    """
+            
+            table_html += """
+                </tbody>
+            </table>
+            """
             
             table_html += """
                 </tbody>
@@ -285,6 +315,9 @@ def project_leaderboard(projectname):
                        timeframe=timeframe,
                        timeframes=dp.timeframes,
                        timestamps=timestamps,
+                       metric=metric, # 👈 이 줄을 추가해야 합니다.
+                       metric_display_name=metric_display_name,
+                       _col_metric=_col_metric,
                        formatted_timestamps=formatted_timestamps,
                        timestamp1=timestamp1,
                        timestamp2=timestamp2,
@@ -296,127 +329,148 @@ def project_leaderboard(projectname):
 # 사용자 상세 분석 페이지
 @app.route('/<projectname>/user/<username>')
 def project_user_analysis(projectname,username):
-    log_access('project_leaderboard', projectname, username)
+    log_access('user', projectname, username)
     try:
-        dp = get_data_processor(projectname)
+        dp = project_instances[projectname]
+        # user_info = dp.get_user_info(username)
+        
+        # URL 쿼리 파라미터에서 metric 가져오기
+        metric = request.query.get('metric', 'snapsPercent')
+        timeframe = request.query.get('timeframe', dp.timeframes[0])
+        
+        user_info = dp.get_user_info_by_timeframe(username, timeframe)
+        # metric에 따라 컬럼 이름 동적 결정
+        if metric == 'cSnapsPercent':
+            rank_col = 'cSnapsPercentRank'
+            mindshare_col = 'cSnapsPercent'
+            mindshare_display_name = 'c마인드쉐어'
+            rank_display_name = 'c순위' 
+        else: # 기본값: snapsPercent
+            rank_col = 'rank'
+            mindshare_col = 'snapsPercent'
+            mindshare_display_name = '마인드쉐어'
+            rank_display_name = '순위'
 
-        timeframe = request.query.get('timeframe', 'TOTAL')
-        
-        # 모든 기간의 사용자 데이터 가져오기
-        user_data = {}
-        for tf in dp.timeframes:  # 7D, 14D, 30D, TOTAL
-            user_data[tf] = dp.get_user_history(username, tf)
-        
-        # 모든 사용자 목록 가져오기 (검색용)
-        all_users = dp.get_all_usernames(timeframe=timeframe)
-        
-        # 선택된 기간의 사용자 정보로 기본 정보 설정
-        if user_data[timeframe].empty:
-            return template('user.html', 
-                           project=projectname,
-                           current_project=projectname,
-                           current_page="user",
-                           username=username, 
-                           user_chart="<p>해당 사용자의 데이터가 없습니다.</p>",
-                           user_info={},
-                           all_users=all_users,
-                           timeframe=timeframe,
-                           timeframes=dp.timeframes)
-        
-        # 사용자 기본 정보 (선택된 기간 기준)
-        latest = user_data[timeframe].iloc[-1]
-        user_info = {
-            'displayName': latest.get('displayName', username),
-            'followers': latest.get('followers', 0),
-            'smartFollowers': latest.get('smartFollowers', 0),
-            'rank': latest.get('rank', 'N/A'),
-            'snapsPercent': latest.get('snapsPercent', 0),
-            'profileImageUrl': latest.get('profileImageUrl', '')
-        }
-        
-        # 4x2 그리드 차트 생성 (각 타임프레임마다 순위와 마인드쉐어 차트 분리)
+        user_data = dp.get_user_analysis(username)
+
+        # ⭐⭐⭐ [수정 1] 4행 1열 서브플롯 생성 및 보조 Y축 설정 ⭐⭐⭐
+        # 4개 기간별 차트를 세로로 나열
         fig = make_subplots(
-            rows=4, cols=2, 
-            subplot_titles=(
-                # 첫 번째 행: 7D 차트
-                "7일 기준 순위 변화", "14일 기준 순위 변화",
-                # 두 번째 행: 7D 마인드쉐어, 14D 마인드쉐어
-                "30일 기준 순위 변화", "TOTAL 기준 순위 변화",
-                # 세 번째 행: 30D 순위, TOTAL 순위
-                "7일 기준 마인드쉐어 변화", "14일 기준 마인드쉐어 변화",
-                # 네 번째 행: 30D 마인드쉐어, TOTAL 마인드쉐어
-                "30일 기준 마인드쉐어 변화", "TOTAL 기준 마인드쉐어 변화"
-            ),
-            vertical_spacing=0.08,
-            horizontal_spacing=0.05,
-            specs=[[{}, {}], [{}, {}], [{}, {}], [{}, {}]]
+            rows=4, cols=1, 
+            subplot_titles=('7D', '14D', '30D', 'TOTAL'),
+            vertical_spacing=0.12, # 차트 간 간격 조정
+            # 모든 서브플롯에 보조 Y축(secondary_y) 활성화
+            specs=[[{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}]]
         )
         
-        # 각 타임프레임과 위치 매핑
-        tf_positions = {
-            '7D': [(1, 1), (3, 1)],  # 순위, 마인드쉐어
-            '14D': [(1, 2), (3, 2)],
-            '30D': [(2, 1), (4, 1)],
-            'TOTAL': [(2, 2), (4, 2)]
-        }
-        
-        # 차트 색상 설정
-        rank_color = 'red'
-        influence_color = 'blue'
-        
-        # 각 타임프레임별 차트 생성
-        for tf, positions in tf_positions.items():
-            rank_pos, influence_pos = positions
+        # ⭐⭐⭐ [수정 2] 차트 그리기 루프: 순위/마쉐를 하나의 서브플롯에 추가 ⭐⭐⭐
+        # dp.timeframes = ['7D', '14D', '30D', 'TOTAL'] 순서를 따름
+        for i, tf in enumerate(dp.timeframes):
+            row_num = i + 1 # 1부터 4까지의 행 번호
             df = user_data[tf]
             
             if not df.empty:
-                # 순위 차트
+                # 1. 순위 변화 (주 Y축: secondary_y=False)
                 fig.add_trace(
                     go.Scatter(
                         x=df['timestamp'], 
-                        y=df['rank'],
+                        y=df[rank_col], 
                         mode='lines+markers',
-                        name=f'순위({tf})',
-                        line=dict(width=2, color=rank_color),
-                        showlegend=False
+                        name=f'순위',
+                        line=dict(width=1, color='#FF0000'), # 파란색 계열
+                        marker=dict(size=2, symbol='circle'),
+                        showlegend=False,
                     ),
-                    row=rank_pos[0], col=rank_pos[1]
+                    row=row_num, col=1, secondary_y=False
                 )
                 
-                # 마인드쉐어 지수 차트
+                # 2. 마인드쉐어 변화 (보조 Y축: secondary_y=True)
                 fig.add_trace(
                     go.Scatter(
                         x=df['timestamp'], 
-                        y=df['snapsPercent'],
+                        y=df[mindshare_col], 
                         mode='lines+markers',
-                        name=f'마인드쉐어({tf})',
-                        line=dict(width=2, color=influence_color),
-                        showlegend=False
+                        name=f'{mindshare_display_name}',
+                        line=dict(width=1, color='#1F77B4', dash='dot'), # 주황색 계열, 점선으로 구분
+                        marker=dict(size=2, symbol='square'),
+                        showlegend=False,
                     ),
-                    row=influence_pos[0], col=influence_pos[1]
+                    row=row_num, col=1, secondary_y=True
                 )
                 
-                # 순위 차트는 y축 반전 (낮을수록 좋음)
-                fig.update_yaxes(autorange="reversed", row=rank_pos[0], col=rank_pos[1])
-        
-        # 차트 레이아웃 조정
+                # Y축 설정
+                # 주 Y축 (순위): 제목 설정 및 순위이므로 Y축 반전
+                fig.update_yaxes(
+                    title_text=f"순위", 
+                    autorange="reversed", 
+                    row=row_num, col=1, secondary_y=False,
+                    gridcolor='lightgray',
+                    zeroline=True,
+                    fixedrange=True
+                )
+                
+                # 보조 Y축 (마인드쉐어): 제목 설정
+                fig.update_yaxes(
+                    title_text=f"{mindshare_display_name} (%)", 
+                    row=row_num, col=1, secondary_y=True,
+                    gridcolor='rgba(0,0,0,0)', # 보조축의 그리드라인은 투명하게 하여 중복 방지
+                    fixedrange=True
+                )
+                # ⭐ [추가 3] X축 설정: X축 드래그/줌 비활성화 ⭐
+                fig.update_xaxes(
+                    row=row_num, col=1, 
+                    fixedrange=True
+                )
+                
+        # ⭐⭐⭐ [수정 3] 레이아웃 및 범례 설정 ⭐⭐⭐
         fig.update_layout(
+            # 4개의 차트가 세로로 나열되므로 높이 조정
             height=1200, 
-            title_text=f"{user_info['displayName']}의 기간별 순위 및 마인드쉐어 분석",
-            hovermode="closest"
+            width=None, # 클라이언트 CSS에 너비를 맡김
+            title_text=f"{user_info['displayName']}의 기간별 변화 분석",
+            hovermode="x unified", # 툴팁을 통합하여 가독성 향상
+            font=dict(size=12),
+            # dragmode="hovermode",
+            showlegend=False
+            # 범례를 차트 하단 중앙에 배치하여 공간 절약 및 가독성 확보
+            # legend=dict(
+                # orientation="h", 
+                # yanchor="bottom", 
+                # y=-0.1, 
+                # xanchor="center", 
+                # x=0.5,
+                # bgcolor="rgba(255, 255, 255, 0.7)",
+                # bordercolor="lightgray",
+                # borderwidth=1
+            # )
         )
         
-        # 각 행의 y축 제목 설정
-        # for i in range(1, 5):
-            # if i == 1 or i == 3:  # 순위 차트
-                # fig.update_yaxes(title_text="순위", row=i, col=1)
-                # fig.update_yaxes(title_text="순위", row=i, col=2)
-            # else:  # 마인드쉐어 차트
-                # fig.update_yaxes(title_text="마인드쉐어 지수", row=i, col=1)
-                # fig.update_yaxes(title_text="마인드쉐어 지수", row=i, col=2)
+        # 서브플롯 제목 글꼴 크기 조정
+        fig.update_annotations(font_size=11)
         
-        user_chart = pio.to_html(fig, full_html=False)
-        
+        user_chart = pio.to_html(fig, 
+                                 full_html=False,
+                                 config={'responsive': True,
+                                 'staticPlot': False,
+                                 'displayModeBar': True,
+                                 'displaylogo': False,
+                                 'modeBarButtonsToRemove': [
+                                         'zoom2d',      # 줌 버튼 제거
+                                         'pan2d',       # 패닝 버튼 제거
+                                         'select2d',    # 선택 버튼 제거 (dragmode='select' 기능 차단)
+                                         'lasso2d',     # 올가미 버튼 제거
+                                         'zoomIn2d',
+                                         'zoomOut2d',
+                                         'autoscale',
+                                         'resetScale2d'
+                                     ]
+                                 }
+                                )
+        try:
+            all_users = dp.get_all_users()
+        except AttributeError:
+            # 안전을 위해 DataProcessor에 해당 메서드가 없을 경우 빈 리스트로 처리
+            all_users = []
         return template('user.html', 
                        project=projectname,
                        current_project=projectname,
@@ -426,7 +480,11 @@ def project_user_analysis(projectname,username):
                        user_info=user_info,
                        all_users=all_users,
                        timeframe=timeframe,
-                       timeframes=dp.timeframes)
+                       metric=metric, 
+                       timeframes=dp.timeframes,
+                       rank_col=rank_col,
+                       mindshare_col = mindshare_col,
+                       json=json)
     except ValueError as e:
         return render_error(str(e), projectname)
 
@@ -443,7 +501,7 @@ def project_compare_users(projectname):
         metrics = {
             'snapsPercent': '마인드쉐어',
             'followers': '팔로워 수',
-            'smartFollowers': '주요 팔로워 수',
+            'smartFollowers': '스마트 팔로워 수',
             'rank': '순위'
         }
         

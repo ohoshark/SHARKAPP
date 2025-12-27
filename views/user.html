@@ -6,6 +6,18 @@
     <title>{{ user_info.get('displayName', username) }} - 스내퍼 분석</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+		.modebar-btn {
+        /* 버튼 전체 영역 (컨테이너) 크기 */
+        width: 30px !important; /* 기본값 24px 또는 28px 에서 증가 */
+        height: 30px !important;
+        padding: 4px !important; /* 내부 여백 조정 */
+		}
+		/* SVG 아이콘 자체의 크기 조정 */
+		.modebar-btn svg {
+			/* 아이콘 뷰포트 크기를 키웁니다. */
+			width: 22px !important; 
+			height: 22px !important;
+		}
         .chart-container {
             margin-top: 30px;
             margin-bottom: 30px;
@@ -90,6 +102,25 @@
 			font-weight: bold;
 			color: #007bff;
 		}
+		.chart-container .card-body {
+			/* pio.to_html로 생성된 div를 감싸는 .card-body의 패딩을 줄여 더 많은 공간 확보 */
+			padding: 0.5rem;
+		}
+		#chartCardBody > div {
+			width: 100% !important; /* 너비를 강제로 100%로 설정 */
+			/* height는 모바일에서 스크롤이 용이하도록 고정/최소 높이 설정 */
+			min-height: 400px;
+		}
+		/* 모바일 기기에서의 최적화 */
+		@media (max-width: 767px) {
+			.stat-card {
+				flex: 1 1 45%; /* 모바일에서 한 줄에 2개씩 표시 */
+				margin: 5px;
+			}
+			.user-stats {
+				justify-content: space-around; /* 중앙 정렬 */
+			}
+		}
 </style>
 </head>
 <body>
@@ -132,79 +163,79 @@
     </div>
 </nav>
 
-    <div class="container mt-4">
-        <!-- 기간 선택 -->
-        <div class="mb-4">
-            <form method="get" action="/{{project}}/user/{{ username }}">
-                <div class="row g-3 align-items-center">
-                    <div class="col-auto">
-                        <label for="timeframe" class="col-form-label">기준 선택:</label>
-                    </div>
-                    <div class="col-auto">
-                        <select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
-                            % for tf in timeframes:
-                                <option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
-                            % end
-                        </select>
-                    </div>
-                </div>
-            </form>
-        </div>
-
-        <!-- 사용자 프로필 및 정보 -->
-        
-		<div class="user-profile">
-            % if user_info.get('profileImageUrl'):
-                <img src="{{ user_info['profileImageUrl'] }}" alt="{{ user_info.get('displayName', username) }}">
-            % end
-            <div><a href="https://x.com/{{username}}" class="user-link">
-                <h1>{{ user_info.get('displayName', username) }}</h1>
-                <p class="text-muted">@{{ username }}</p>
-            </a></div>
-        </div>
-
-        <!-- 사용자 통계 -->
-        <div class="user-stats">
-            <div class="stat-card card">
-                <div class="card-body">
-                    <h5 class="card-title">순위</h5>
-                    <h2 class="card-text">{{ user_info.get('rank', 'N/A') }}</h2>
-                </div>
-            </div>
-            <div class="stat-card card">
-                <div class="card-body">
-                    <h5 class="card-title">마인드쉐어</h5>
-                    <h2 class="card-text">{{ "{:.2f}".format(user_info.get('snapsPercent', 0)) }}</h2>
-                </div>
-            </div>
-            <div class="stat-card card">
-                <div class="card-body">
-                    <h5 class="card-title">팔로워</h5>
-                    <h2 class="card-text">{{ "{:,}".format(user_info.get('followers', 0)) }}</h2>
-                </div>
-            </div>
-            <div class="stat-card card">
-                <div class="card-body">
-                    <h5 class="card-title">주요 팔로워</h5>
-                    <h2 class="card-text">{{ "{:,}".format(user_info.get('smartFollowers', 0)) }}</h2>
-                </div>
-            </div>
-        </div>
-
-		<!-- 사용자 차트 -->
-		<div class="chart-container">
-			<div class="card">
-				<div class="card-header">
-					<h3>기준별 마인드쉐어 및 순위 변화 분석</h3>
+<div class="container mt-4">
+    <div class="mb-4">
+		<form method="get" action="/{{project}}/user/{{ username }}" id="analysisOptionsForm">
+			<div class="row g-3">
+				<div class="col-6 col-lg-auto d-flex align-items-center">
+					<label for="timeframe" class="col-form-label me-2 mb-0 text-nowrap">기간 기준:</label>
+					<select class="form-select" id="timeframe" name="timeframe" onchange="document.getElementById('analysisOptionsForm').submit()">
+						% for tf in timeframes:
+							<option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+						% end
+					</select>
 				</div>
-				<div class="card-body chart-relative" id="chartCardBody">
-                    <div id="chart-loading-overlay" class="chart-loading-overlay">
-                        차트 데이터 로딩 중...
-                    </div>
-					{{ !user_chart }}
+				<div class="col-6 col-lg-auto d-flex align-items-center">
+					<label for="metric" class="col-form-label me-2 mb-0 text-nowrap">지표 기준:</label>
+					<select class="form-select" id="metric" name="metric" onchange="document.getElementById('analysisOptionsForm').submit()">
+						<option value="snapsPercent" {{ 'selected' if metric == 'snapsPercent' else '' }}>Mindshare</option>
+						<option value="cSnapsPercent" {{ 'selected' if metric == 'cSnapsPercent' else '' }}>cMindshare</option>
+					</select>
 				</div>
 			</div>
-		</div>
+		</form>
+    </div>
+
+    <div class="user-profile">
+        % if user_info.get('profileImageUrl'):
+            <img src="{{ user_info['profileImageUrl'] }}" alt="{{ user_info.get('displayName', username) }}">
+        % end
+        <div><a href="https://x.com/{{username}}" class="user-link">
+            <h1>{{ user_info.get('displayName', username) }}</h1>
+            <p class="text-muted">@{{ username }}</p>
+        </a></div>
+    </div>
+
+    <div class="user-stats">
+        <div class="stat-card card">
+            <div class="card-body">
+                <h5 class="card-title">{{ '순위' if metric == 'snapsPercent' else 'c순위' }} ({{ timeframe }})</h5>
+                <h2 class="card-text">{{ user_info.get(rank_col, '-') }}</h2>
+            </div>
+        </div>
+        <div class="stat-card card">
+            <div class="card-body">
+				<h5 class="card-title">{{ '마인드쉐어' if metric == 'snapsPercent' else 'c마인드쉐어' }} ({{ timeframe }})</h5>
+                    <h2 class="card-text">{{ "{:.2f}%".format(user_info.get(mindshare_col, 0.0)) }}</h2>
+            </div>
+        </div>
+        <div class="stat-card card">
+            <div class="card-body">
+                <h5 class="card-title">팔로워</h5>
+                <h2 class="card-text">{{ "{:,}".format(user_info.get('followers', 0)) }}</h2>
+            </div>
+        </div>
+        <div class="stat-card card">
+            <div class="card-body">
+                <h5 class="card-title">스마트 팔로워</h5>
+                <h2 class="card-text">{{ "{:,}".format(user_info.get('smartFollowers', 0)) }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <div class="card">
+            <div class="card-header">
+                <h3>기준별 {{ '마인드쉐어' if metric == 'snapsPercent' else 'c마인드쉐어' }} 및 순위 변화 분석</h3>
+            </div>
+            <div class="card-body chart-relative" id="chartCardBody">
+                <div id="chart-loading-overlay" class="chart-loading-overlay">
+                    차트 데이터 로딩 중...
+                </div>
+                {{ !user_chart }}
+            </div>
+        </div>
+    </div>
 
         <!-- 사용자 검색창 추가 -->
         <div class="row mb-4">
@@ -246,23 +277,25 @@
                        user.displayName.toLowerCase().includes(searchVal);
             }).slice(0, 10); // 최대 10개 결과만 표시
             
-            // 결과 표시
-            if (filteredUsers.length > 0) {
-                searchResults.innerHTML = '';
-                filteredUsers.forEach(user => {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    item.innerHTML = `<strong>${user.displayName}</strong> <span class="text-muted">@${user.username}</span>`;
-                    item.addEventListener('click', function() {
-                        window.location.href = `/user/${user.username}?timeframe={{ timeframe }}`;
-                    });
-                    searchResults.appendChild(item);
+// 결과 표시
+        if (filteredUsers.length > 0) {
+            searchResults.innerHTML = '';
+            filteredUsers.forEach(user => {
+                const item = document.createElement('div');
+                item.className = 'search-result-item';
+                item.innerHTML = `<strong>${user.displayName}</strong> <span class="text-muted">@${user.username}</span>`;
+                item.addEventListener('click', function() {
+                    // ⭐ [수정] metric 파라미터 추가 ⭐
+                    const currentMetric = document.getElementById('metric').value;
+                    window.location.href = `/{{project}}/user/${user.username}?timeframe={{ timeframe }}&metric=${currentMetric}`;
                 });
-                searchResults.style.display = 'block';
-            } else {
-                searchResults.style.display = 'none';
-            }
-        });
+                searchResults.appendChild(item);
+            });
+            searchResults.style.display = 'block';
+        } else {
+            searchResults.style.display = 'none';
+        }
+    });
         
         // 검색창 외부 클릭 시 결과 숨기기
         document.addEventListener('click', function(e) {

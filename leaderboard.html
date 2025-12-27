@@ -90,9 +90,9 @@
 		.table-responsive td:nth-of-type(2):before { content: "이전 순위"; }
 		.table-responsive td:nth-of-type(3):before { content: "현재 순위"; }
 		.table-responsive td:nth-of-type(4):before { content: "순위 변화"; }
-		.table-responsive td:nth-of-type(5):before { content: "이전 마쉐"; }
-		.table-responsive td:nth-of-type(6):before { content: "현재 마쉐"; } 
-		.table-responsive td:nth-of-type(7):before { content: "마쉐 변화"; } 
+		.table-responsive td:nth-of-type(5):before { content: "이전 {{_col_metric}}마쉐"; }
+		.table-responsive td:nth-of-type(6):before { content: "현재 {{_col_metric}}마쉐"; } 
+		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}마쉐 변화"; } 
 		/* ... 테이블 구조에 맞게 인덱스와 content를 조정하세요. */
 		
 		.table-responsive td:nth-of-type(1) {
@@ -195,19 +195,26 @@
             <div class="card-header">
                 <h3>비교할 시간대 선택</h3>
             </div>
-			<div class="card-body">
-				<form method="get" action="/{{project}}/leaderboard" id="comparisonForm">
-					<div class="row mb-3">
-						<div class="col-md-4">
-							<label for="timeframe" class="form-label">데이터 기준:</label>
-							<select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
-								% for tf in timeframes:
-									<option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
-								% end
-							</select>
+				<div class="card-body">
+					<form method="get" action="/{{project}}/leaderboard" id="comparisonForm">
+						<div class="row mb-3">
+							<div class="col-md-4">
+								<label for="timeframe" class="form-label">데이터 기준:</label>
+								<select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
+									% for tf in timeframes:
+										<option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+									% end
+								</select>
+							</div>
+							
+							<div class="col-md-4">
+								<label for="metric" class="form-label">지표 기준:</label>
+								<select class="form-select" id="metric" name="metric" onchange="this.form.submit()">
+									<option value="snapsPercent" {{ 'selected' if metric == 'snapsPercent' else '' }}>Mindshare</option>
+									<option value="cSnapsPercent" {{ 'selected' if metric == 'cSnapsPercent' else '' }}>cMindshare</option>
+								</select>
+							</div>
 						</div>
-					</div>
-
 					<div class="row mb-4">
 						<div class="col-12">
 							<div class="d-flex justify-content-between mb-3">
@@ -458,25 +465,26 @@
 	</script>
 
 <div class="fixed-bottom d-flex justify-content-end p-4">
-        <div class="dropdown dropup">
-            <button class="btn btn-primary btn-lg rounded-circle shadow-lg" 
-                    type="button" 
-                    id="fabSortDropdown" 
-                    data-bs-toggle="dropdown" 
-                    aria-expanded="false"
-                    style="width: 60px; height: 60px;">
-                <i class="fas fa-sort-amount-down-alt"></i> </button>
+    <div class="dropdown dropup">
+        <button class="btn btn-primary btn-lg rounded-circle shadow-lg" 
+                type="button" 
+                id="fabSortDropdown" 
+                data-bs-toggle="dropdown" 
+                aria-expanded="false"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-sort-amount-down-alt"></i> </button>
 
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
-                <li class="dropdown-header">정렬 기준 선택</li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">이전 순위</a></li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">현재 순위</a></li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">순위 변화</a></li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">이전 마쉐</a></li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">현재 마쉐</a></li>
-                <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">마쉐 변화</a></li>
-            </ul>
-        </div>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
+            <li class="dropdown-header">정렬 기준 선택</li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">이전 순위</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">현재 순위</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">순위 변화</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">이전 {{ metric_display_name }}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">현재 {{ metric_display_name }}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{ metric_display_name }} 변화</a></li>
+        </ul>
     </div>
-    </body>
+</div>
+
+</body>
 </html>
