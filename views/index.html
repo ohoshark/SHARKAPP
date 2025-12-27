@@ -123,5 +123,47 @@
 	}
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<div id="creator-widget" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; font-family: 'sans-serif';">
+    <div id="creator-card" style="display: none; width: 280px; background: #1a1a1a; color: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 15px; overflow: hidden; border: 1px solid #333;">
+        <div style="background: linear-gradient(135deg, #444, #111); padding: 20px; text-align: center;">
+            <img src="/static/cookie_shark.png" alt="ohoshark" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #00d2ff; background: #fff;">
+            <h5 style="margin: 10px 0 5px; font-weight: bold;">ohoshark</h5>
+            <p style="font-size: 0.85rem; color: #aaa; margin-bottom: 15px;">Lead Developer & Data Analyst</p>
+            
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
+                <a href="https://twitter.com/racoooncom" target="_blank" style="color: #1DA1F2; font-size: 1.2rem;"><i class="fab fa-twitter"></i></a>
+                <a href="https://t.me/oHoShark" target="_blank" style="color: #0088cc; font-size: 1.2rem;"><i class="fab fa-telegram"></i></a>
+            </div>
+            
+            <div onclick="copyWalletAddress()" style="cursor: pointer; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; border: 1px dashed #555; transition: 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                <span style="font-size: 0.75rem; color: #00d2ff; display: block; margin-bottom: 3px;">Donation (ENS)</span>
+                <strong style="font-size: 0.9rem;">ohoshark.eth</strong>
+                <small style="display: block; font-size: 0.65rem; color: #777; margin-top: 5px;">클릭하여 지갑 주소 복사</small>
+            </div>
+        </div>
+    </div>
+
+    <div onclick="toggleCreatorCard()" style="width: 60px; height: 60px; background: white; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px solid #00d2ff; transition: transform 0.3s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+        <img src="/static/image-removebg-preview-removebg-preview.png" style="width: 110%; height: auto; margin-top: 5px;">
+    </div>
+</div>
+
+<script>
+    // 카드 토글 함수
+    function toggleCreatorCard() {
+        const card = document.getElementById('creator-card');
+        card.style.display = (card.style.display === 'none') ? 'block' : 'none';
+    }
+
+    // 지갑 주소 복사 함수
+    function copyWalletAddress() {
+        const address = "0xC8e695B30EF512AE634007efa89A75E1421e3055";
+        navigator.clipboard.writeText(address).then(() => {
+            alert("지갑 주소가 복사되었습니다! 감사합니다. 🦈");
+        }).catch(err => {
+            console.error('복사 실패:', err);
+        });
+    }
+</script>
 </body>
 </html>

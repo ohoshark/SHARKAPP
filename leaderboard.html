@@ -14,33 +14,56 @@
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
     <style>
-	/* FAB 버튼 아이콘 중앙 정렬 */
-    .btn-primary.rounded-circle i {
-        /* 부트스트랩 5에서 Flexbox를 사용하여 내부 아이콘을 중앙에 배치 */
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        font-size: 1.5rem; /* 아이콘 크기 조정 */
-        /* 아이콘 색상을 버튼 색상에 맞게 조정 (선택 사항) */
-        color: white; 
-    }
+	@media (max-width: 767.98px) {
+		.container.mt-4 {
+			padding-bottom: 100px !important; /* FAB 버튼 높이(60px)보다 넉넉하게 줌 */
+		}
+	}
+	.noUi-handle.red-indicator {
+		border-color: #FF0000; 
+		box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.4); 
+	}
+	.fab-custom-size {
+		width: 50px; 
+		height: 50px;
+		padding: 0 !important; 
+		display: flex; 
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+	}
+	.fab-custom-size i {
+		font-size: 1.5rem; 
+		color: white; 
+	}
+	.btn-info.rounded-circle i {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		font-size: 1.5rem; 
+		color: white; 
+	}
+	.btn-info.rounded-circle { 
+		background-color: gray !important; 
+		border-color: gray !important;     
+}
 	
     
-    /* 드롭다운 메뉴 위치 조정 (버튼 위) */
+    
     .dropdown-menu-end {
-        /* 모바일 환경에서 드롭다운 메뉴가 화면을 넘어가지 않도록 */
+        
         left: auto !important;
         right: 0;
     }
     
-    /* 스크롤바와 겹치지 않도록 버튼에 약간의 오른쪽 마진 부여 */
+    
     .fixed-bottom {
         padding-right: 20px !important;
     }
 	@media (max-width: 767.98px) {
-		/* 테이블을 블록 요소로 강제 변환 */
+		
 		.table-responsive .table,
 		.table-responsive thead,
 		.table-responsive tbody,
@@ -50,32 +73,32 @@
 			display: block;
 		}
 
-		/* 헤더 숨기기 */
+		
 		.table-responsive thead tr {
 			position: absolute;
 			top: -9999px;
 			left: -9999px;
 		}
 
-		/* 행(tr)을 구분하기 쉽도록 경계선 및 여백 추가 */
+		
 		.table-responsive tbody tr {
 			border: 1px solid #ccc;
 			margin-bottom: 15px;
 			padding: 10px;
 		}
 
-		/* 셀(td)을 세로로 쌓기 */
+		
 		.table-responsive td {
 			border: none;
 			border-bottom: 1px solid #eee;
 			position: relative;
-			padding-left: 50% !important; /* 레이블 공간 확보 */
+			padding-left: 50% !important; 
 			text-align: right;
 		}
 
-		/* 레이블 생성 (첫 번째 열의 제목을 레이블로 사용) */
+		
 		.table-responsive td:before {
-			/* 헤더의 제목을 content에 넣어 레이블로 표시 (주의: 이 부분은 서버 측 렌더링 또는 JavaScript로 처리하는 것이 더 정확합니다) */
+			
 			position: absolute;
 			left: 6px;
 			width: 45%;
@@ -85,7 +108,7 @@
 			font-weight: bold;
 		}
 		
-		/* 실제 레이블 매핑 (CSS만으로는 동적 헤더 매핑이 어려워 예시로 둡니다.) */
+		
 		.table-responsive td:nth-of-type(1):before { content: "사용자"; }
 		.table-responsive td:nth-of-type(2):before { content: "이전 순위"; }
 		.table-responsive td:nth-of-type(3):before { content: "현재 순위"; }
@@ -93,26 +116,26 @@
 		.table-responsive td:nth-of-type(5):before { content: "이전 {{_col_metric}}마쉐"; }
 		.table-responsive td:nth-of-type(6):before { content: "현재 {{_col_metric}}마쉐"; } 
 		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}마쉐 변화"; } 
-		/* ... 테이블 구조에 맞게 인덱스와 content를 조정하세요. */
+		
 		
 		.table-responsive td:nth-of-type(1) {
-        /* 데이터 자체를 왼쪽 정렬 */
+        
         text-align: left; 
-        /* 레이블 공간 확보를 위한 왼쪽 패딩을 줄이거나 조정합니다. */
+        
         padding-left: 5px !important; 
 		}
 		
-		/* 사용자 이름 레이블 (td:nth-of-type(1):before)은 숨기거나 제거 */
-		/* 레이블이 필요 없다면 아래 코드를 추가하여 "사용자" 레이블을 숨깁니다. */
+		
+		
 		.table-responsive td:nth-of-type(1):before { 
 			display: none; 
 		}
 		
 	}
 		.d-flex.justify-content-end.mt-5 {
-				/* z-index가 작동하려면 position 속성이 필요합니다. */
+				
 				position: relative; 
-				/* 슬라이더 핸들(noUi-handle)의 기본 z-index보다 높은 값을 설정합니다. */
+				
 				z-index: 100; 
 			}
         .timestamp-selector {
@@ -130,20 +153,20 @@
             font-weight: bold;
         }
 		.user-link {
-			/* 밑줄 제거 */
+			
 			text-decoration: none; 
-			/* 링크 기본 색상(파란색) 초기화 (검은색으로 설정) */
+			
 			color: inherit; 
-			/* hover 시 색상 변화 방지 (선택 사항) */
-			/* color: inherit; */ 
+			
+			 
 		}
 		.timestamp-selector {
             margin-bottom: 20px;
         }
-		/* hover 시 밑줄 생기는 것 방지 (선택 사항) */
+		
 		.user-link:hover {
 			text-decoration: none;
-			color: inherit; /* hover 시 텍스트 색상 변경 방지 */
+			color: inherit; 
 		}
     </style>
 </head>
@@ -177,7 +200,6 @@
                     {{ current_project.upper() }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="projectDropdown">
-                    <!-- <li><h6 class="dropdown-header">기본 프로젝트</h6></li> -->
                     <li><a class="dropdown-item" href="/vooi/{{current_page}}">VOOI</a></li>
                     <li><a class="dropdown-item" href="/spaace/{{current_page}}">SPAACE</a></li>
                     <li><a class="dropdown-item" href="/superform/{{current_page}}">SUPERFORM</a></li>
@@ -190,7 +212,6 @@
     <div class="container mt-4">
         <h1 class="mb-4">{{project.upper()}} 리더보드 변화 분석</h1>
         
-        <!-- 기간 및 타임스탬프 선택 -->
         <div class="card timestamp-selector">
             <div class="card-header">
                 <h3>비교할 시간대 선택</h3>
@@ -236,14 +257,16 @@
 					</div>
 					
 					</form>
-				
 				<div class="d-flex justify-content-end mt-5">
+				    <form action="../{{project}}/leaderboard" method="get">
+					<input type="hidden" name="timeframe" value="{{timeframe}}">
+					<input type="hidden" name="metric" value="{{metric}}">
+						<button type="submit" class="btn btn-primary me-3" >최근 9시간</button></form>
 					<button type="submit" class="btn btn-primary" form="comparisonForm">비교하기</button>
 				</div>
 			</div>
 		</div>
         
-        <!-- 비교 결과 테이블 -->
         <div class="card comparison-table">
             <div class="card-header">
                 <h3>
@@ -253,50 +276,30 @@
                     </small>
                 </h3>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    {{ !table_html }}
-                </div>
-                
-                <div class="mt-3">
-                    <!-- <small class="d-block mb-2"> -->
-                        <!-- <span class="text-success">↑</span> 순위가 상승했음을 의미합니다 (낮은 숫자가 더 좋은 순위) -->
-                    <!-- </small> -->
-                    <!-- <small class="d-block"> -->
-                        <!-- <span class="text-success">↑</span> 마인드쉐어 지수가 증가했음을 의미합니다 -->
-                    <!-- </small> -->
-                </div>
-            </div>
+			<div class="card-body">
+				<div class="table-responsive">
+					{{ !table_html }} </div>
+			</div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-		// leaderboard.html (스크립트 부분)
-
-		// -------------------------------------------------------------------------
-		// ⭐ [추가] 미니 타임라인 (noUiSlider) 로직 ⭐
-		// -------------------------------------------------------------------------
-
-		// 서버에서 전달받은 원본 타임스탬프 리스트를 JavaScript에서 사용 가능한 형태로 변환
 		const rawTimestamps = [
 			% for ts in timestamps:
 				"{{ ts }}",
 			% end
 		];
 
-		// 서버에서 전달받은 포맷팅된 타임스탬프 리스트를 JavaScript에서 사용 가능한 형태로 변환
 		const formattedTimestamps = {
 			% for ts_key, ts_value in formatted_timestamps.items():
 				"{{ ts_key }}": "{{ ts_value }}",
 			% end
 		};
 
-		// 현재 선택된 timestamp1, timestamp2
 		const currentTs1 = "{{ timestamp1 }}";
 		const currentTs2 = "{{ timestamp2 }}";
 
-		// 타임스탬프 문자열을 인덱스로 변환하는 맵 (슬라이더는 숫자 인덱스를 사용)
 		const timestampMap = {};
 		rawTimestamps.forEach((ts, index) => {
 			timestampMap[ts] = index;
@@ -310,58 +313,66 @@
 			const display1 = document.getElementById('slider-timestamp1');
 			const display2 = document.getElementById('slider-timestamp2');
 
-			// 타임스탬프가 2개 이상일 때만 슬라이더 초기화
 			if (rawTimestamps.length >= 2) {
-				
-				// ⭐ [핵심 수정] URL 값의 인덱스를 명시적으로 찾습니다.
+				const min_index = 0;
+				const max_index = rawTimestamps.length - 1;
 				let start1_index = timestampMap[currentTs1];
 				let start2_index = timestampMap[currentTs2];
 
-				// 인덱스 0(첫 번째 값)이 넘어왔을 때 || 연산자가 잘못 작동하는 것을 방지합니다.
-				// URL 타임스탬프가 유효하지 않으면 기본값(뒤에서 두 번째/마지막)을 사용합니다.
 				const start1 = (start1_index === undefined) ? rawTimestamps.length - 2 : start1_index;
 				const start2 = (start2_index === undefined) ? rawTimestamps.length - 1 : start2_index;
 
 				noUiSlider.create(slider, {
-					start: [start1, start2], // [timestamp1 인덱스, timestamp2 인덱스]
+					start: [start1, start2], 
 					connect: true,
-					step: 1, // 1단계씩 이동 (타임스탬프 1개 단위)
+					step: 1, 
 					range: {
 						'min': 0,
 						'max': rawTimestamps.length - 1
 					},
-					pips: { // 주요 지점에 표시를 추가 (선택 사항)
+					pips: { 
 						mode: 'count',
 						values: 5,
 						density: 4
 					}
 				});
 
-				// 슬라이더 값이 변경될 때마다 실행되는 이벤트
 				slider.noUiSlider.on('update', function (values, handle) {
-					// values는 현재 핸들 위치의 인덱스 [index1, index2]
 					const index1 = Math.round(values[0]);
 					const index2 = Math.round(values[1]);
 					
-					// 인덱스를 실제 타임스탬프 문자열로 변환
 					const newTs1 = rawTimestamps[index1];
 					const newTs2 = rawTimestamps[index2];
 					
-					// 폼 제출에 사용될 숨겨진 입력 필드 업데이트
 					input1.value = newTs1;
 					input2.value = newTs2;
 					
-					// 화면에 표시되는 텍스트 업데이트
 					display1.textContent = formattedTimestamps[newTs1] || newTs1;
 					display2.textContent = formattedTimestamps[newTs2] || newTs2;
+					
+					const handles = slider.getElementsByClassName('noUi-handle');
+					
+					if (handles[0]) {
+						if (index1 === min_index) {
+							handles[0].classList.add('red-indicator');
+						} else {
+							handles[0].classList.remove('red-indicator');
+						}
+					}
+				
+					if (handles[1]) {
+						if (index2 === max_index) {
+							handles[1].classList.add('red-indicator');
+						} else {
+							handles[1].classList.remove('red-indicator');
+						}
+					}
 				});
-
 			} else {
-				// 데이터가 부족한 경우 슬라이더 대신 메시지 표시
 				document.getElementById('timeSlider').innerHTML = '<p class="text-warning">비교 가능한 타임스탬프 데이터가 부족합니다.</p>';
 			}
-
-			// 폼 제출 전 검증 (슬라이더는 자동으로 서로 다른 값을 선택하도록 제한되지만, 폼 전송 전에 다시 확인)
+			
+			
 			document.getElementById('comparisonForm').addEventListener('submit', function(e) {
 				if (input1.value === input2.value) {
 					e.preventDefault();
@@ -373,10 +384,8 @@
     </script>
 	<script>
 		$.fn.dataTable.ext.type.order['special-num-pre'] = function ( data ) {
-			// '↑', '↓', 콤마(,), 공백 등을 제거하고 숫자만 남깁니다.
 			let num = data.replace(/[↑↓,-]/g, ''); 
 			
-			// 만약 데이터가 '-' (변화 없음)라면 0으로 간주합니다.
 			if (num === '') {
 				return 0;
 			}
@@ -385,10 +394,8 @@
 		};
 
 
-		// 기존 DataTables 및 정렬 스크립트를 이 하나의 블록으로 통합합니다.
 		$(document).ready(function() {
 			
-			// 1. DataTables 인스턴스를 var 또는 let으로 선언하여 스코프 내에서 사용 가능하게 합니다.
 			const table = $('#leaderboardTable').DataTable({
 				"paging": false,
 				"info": false,
@@ -398,82 +405,160 @@
 					"emptyTable": "비교할 데이터가 없습니다.",
 					"zeroRecords": "일치하는 데이터가 없습니다."
 				},
-				"order": [[2, 'asc']], // 기본 정렬: 현재 순위 (인덱스 2) 기준 오름차순
+				"order": [[2, 'asc']], 
 				"columnDefs": [
 					{ "orderable": false, "targets": 0 },
 					{ "orderable": true, "targets": "_all" }
 				]
 			});
 			
-			// 테이블 스타일 조정
 			$('.dataTables_wrapper').addClass('no-footer');
 
 
-			// 2. ⭐ 현재 정렬 상태를 추적할 전역 변수 설정 ⭐
-			let currentSortColumn = 3; // DataTables 초기 정렬 인덱스
-			let currentSortDirection = 'asc'; // DataTables 초기 정렬 방향
+			let currentSortColumn = 2; 
+			let currentSortDirection = 'desc'; 
 
-            // 3. ⭐ 초기 FAB 아이콘 및 드롭다운 항목에 표시 적용 ⭐
-			const initialIndicator = (currentSortDirection === 'asc') ? ' ▲' : ' ▼';
-            // DataTables의 기본 정렬(현재 순위, data-column="3")에 표시 추가
+			const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
             const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
             if (defaultSortOption.length) {
                 defaultSortOption.text(defaultSortOption.text() + initialIndicator);
             }
-            // FAB 버튼 아이콘 초기 설정
-			$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-up-alt');
+			$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt'); // 'desc' 방향 아이콘
 
 
-			// 4. ⭐ FAB 드롭다운 항목 클릭 이벤트 처리 (토글 및 표시) ⭐
 			$('.sort-option').on('click', function(e) {
 				e.preventDefault();
 				
 				const requestedColumn = parseInt($(this).data('column'));
-				const defaultDirection = $(this).data('default-dir') || 'asc'; 
+				const defaultDirection = $(this).data('default-dir') || 'desc'; 
 				let newDirection;
 
-                // 1단계: 새 정렬 방향 결정 (토글 로직)
 				if (requestedColumn === currentSortColumn) {
 					newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
 				} else {
 					newDirection = defaultDirection;
 				}
 
-                // 2단계: 기존 표시 제거
                 $('.sort-option').each(function() {
                     let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
                     $(this).text(text);
                 });
 
-                // 3단계: DataTables 정렬 적용
 				table.order([requestedColumn, newDirection]).draw();
 
-                // 4단계: 상태 업데이트
 				currentSortColumn = requestedColumn;
 				currentSortDirection = newDirection;
 
-                // 5단계: 새로운 표시 추가
                 const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
                 const currentText = $(this).text();
                 $(this).text(currentText + indicator);
 
-                // 6단계: FAB 버튼의 아이콘 업데이트
 				const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
 				$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
 			});
+			
+		const $usernameInput = $('#usernameInput');
+		const $searchResults = $('#searchResults');
+		const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
+		
+		function searchUsers(query) {
+			$searchResults.empty();
+			if (query.length < 2) { 
+				$searchResults.append('<div class="list-group-item">최소 2글자 이상 입력해주세요.</div>');
+				return;
+			}
+
+			const lowerQuery = query.toLowerCase();
+			const foundUsers = [];
+			
+			table.rows().every(function() { 
+				const rowData = this.data();
+				const usernameCellHtml = rowData[0];
+				const username = $(usernameCellHtml).text().trim(); 
+				
+				if (username.toLowerCase().includes(lowerQuery)) {
+					foundUsers.push({
+						username: username,
+						data: rowData
+					});
+				}
+			});
+
+
+			if (foundUsers.length === 0) {
+				$searchResults.append('<div class="list-group-item list-group-item-warning">일치하는 사용자가 없습니다.</div>');
+				return;
+			}
+
+			foundUsers.forEach(function(user) {
+				const $item = $(
+					'<a href="#" class="list-group-item list-group-item-action" ' +
+					'data-username="' + user.username + '">' + 
+					user.username + '</a>'
+				);
+				$searchResults.append($item);
+			});
+		}
+
+		let searchTimer;
+		$usernameInput.on('keyup', function() {
+			clearTimeout(searchTimer);
+			const query = $usernameInput.val().trim();
+			searchTimer = setTimeout(function() {
+				searchUsers(query);
+			}, 300);
+		});
+
+		$searchResults.on('click', 'a.list-group-item-action', function(e) {
+			e.preventDefault();
+			
+			const usernameToFind = $(this).data('username');
+			let $targetRow = null;
+
+			table.rows().every(function() {
+				const rowData = this.data();
+				const cellText = $(rowData[0]).text().trim(); 
+				if (cellText === usernameToFind) {
+					$targetRow = $(this.node()); 
+					return false; 
+				}
+			});
+
+			if ($targetRow && $targetRow.length) {
+				table.search('').draw();
+				
+				$('html, body').animate({
+					scrollTop: $targetRow.offset().top - 100 
+				}, 500);
+
+				$targetRow.css('background-color', '#ffffe0'); 
+				setTimeout(function() {
+					$targetRow.css('background-color', ''); 
+				}, 2000);
+				
+				searchModal.hide();
+			} else {
+				alert('테이블에서 사용자를 찾을 수 없습니다.');
+			}
+		});
+
+		document.getElementById('searchModal').addEventListener('shown.bs.modal', function () {
+			$('#usernameInput').focus();
+		});
+			
 		});
 	</script>
 
-<div class="fixed-bottom d-flex justify-content-end p-4">
-    <div class="dropdown dropup">
-        <button class="btn btn-primary btn-lg rounded-circle shadow-lg" 
+<div class="fixed-bottom d-flex flex-column align-items-end p-4" style="z-index: 80; left:auto;">
+    <div class="dropdown dropup mb-3">
+        <button class="btn btn-primary btn-lg rounded-circle shadow-lg fab-custom-size" 
                 type="button" 
                 id="fabSortDropdown" 
                 data-bs-toggle="dropdown" 
                 aria-expanded="false"
                 style="width: 60px; height: 60px;">
-            <i class="fas fa-sort-amount-down-alt"></i> </button>
-
+            <i class="fas fa-sort-amount-down-alt"></i>
+        </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
             <li class="dropdown-header">정렬 기준 선택</li>
             <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">이전 순위</a></li>
@@ -484,7 +569,64 @@
             <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{ metric_display_name }} 변화</a></li>
         </ul>
     </div>
+    
+    <div class="d-flex align-items-center">
+		<button class="btn btn-secondary btn-lg rounded-circle shadow-lg me-3 fab-custom-size" 
+				type="button" 
+				id="fabScrollTop" 
+				style="background-color: #6c757d !important; border-color: #6c757d !important; display: none;"> 
+			<i class="fas fa-arrow-up"></i>
+		</button>
+        
+        <button class="btn btn-info btn-lg rounded-circle shadow-lg fab-custom-size" 
+                type="button" 
+                data-bs-toggle="modal" 
+                data-bs-target="#searchModal"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-search"></i>
+        </button> 
+    </div>
 </div>
 
+<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered"> <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="searchModalLabel">사용자 검색 및 이동</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="usernameInput" class="form-label">검색할 사용자 이름:</label>
+          <input type="text" class="form-control" id="usernameInput" placeholder="사용자 이름을 입력하세요">
+        </div>
+        <div id="searchResults" class="list-group">
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+	const scrollTopButton = document.getElementById('fabScrollTop');
+	const scrollThreshold = 300; 
+
+
+	window.addEventListener('scroll', function() {
+		if (window.scrollY > scrollThreshold) {
+			scrollTopButton.style.display = 'flex';
+		} else {
+			scrollTopButton.style.display = 'none';
+		}
+	});
+
+	scrollTopButton.addEventListener('click', function(e) {
+		e.preventDefault();
+		$('html, body').animate({
+			scrollTop: 0
+		}, 500); 
+	});
+</script>
 </body>
 </html>

@@ -292,10 +292,6 @@ def project_leaderboard(projectname):
             </table>
             """
             
-            table_html += """
-                </tbody>
-            </table>
-            """
         else:
             table_html = "<p>비교할 데이터가 없습니다.</p>"
         
@@ -336,7 +332,8 @@ def project_user_analysis(projectname,username):
         
         # URL 쿼리 파라미터에서 metric 가져오기
         metric = request.query.get('metric', 'snapsPercent')
-        timeframe = request.query.get('timeframe', dp.timeframes[0])
+        timeframe='TOTAL'
+        # timeframe = request.query.get('timeframe', dp.timeframes[0])
         
         user_info = dp.get_user_info_by_timeframe(username, timeframe)
         # metric에 따라 컬럼 이름 동적 결정
@@ -398,6 +395,7 @@ def project_user_analysis(projectname,username):
                     row=row_num, col=1, secondary_y=True
                 )
                 
+                
                 # Y축 설정
                 # 주 Y축 (순위): 제목 설정 및 순위이므로 Y축 반전
                 fig.update_yaxes(
@@ -422,50 +420,56 @@ def project_user_analysis(projectname,username):
                     fixedrange=True
                 )
                 
-        # ⭐⭐⭐ [수정 3] 레이아웃 및 범례 설정 ⭐⭐⭐
-        fig.update_layout(
-            # 4개의 차트가 세로로 나열되므로 높이 조정
-            height=1200, 
-            width=None, # 클라이언트 CSS에 너비를 맡김
-            title_text=f"{user_info['displayName']}의 기간별 변화 분석",
-            hovermode="x unified", # 툴팁을 통합하여 가독성 향상
-            font=dict(size=12),
-            # dragmode="hovermode",
-            showlegend=False
-            # 범례를 차트 하단 중앙에 배치하여 공간 절약 및 가독성 확보
-            # legend=dict(
-                # orientation="h", 
-                # yanchor="bottom", 
-                # y=-0.1, 
-                # xanchor="center", 
-                # x=0.5,
-                # bgcolor="rgba(255, 255, 255, 0.7)",
-                # bordercolor="lightgray",
-                # borderwidth=1
-            # )
-        )
-        
-        # 서브플롯 제목 글꼴 크기 조정
-        fig.update_annotations(font_size=11)
-        
-        user_chart = pio.to_html(fig, 
-                                 full_html=False,
-                                 config={'responsive': True,
-                                 'staticPlot': False,
-                                 'displayModeBar': True,
-                                 'displaylogo': False,
-                                 'modeBarButtonsToRemove': [
-                                         'zoom2d',      # 줌 버튼 제거
-                                         'pan2d',       # 패닝 버튼 제거
-                                         'select2d',    # 선택 버튼 제거 (dragmode='select' 기능 차단)
-                                         'lasso2d',     # 올가미 버튼 제거
-                                         'zoomIn2d',
-                                         'zoomOut2d',
-                                         'autoscale',
-                                         'resetScale2d'
-                                     ]
-                                 }
-                                )
+
+            # ⭐⭐⭐ [수정 3] 레이아웃 및 범례 설정 ⭐⭐⭐
+            fig.update_layout(
+                # 4개의 차트가 세로로 나열되므로 높이 조정
+                height=1200, 
+                width=None, # 클라이언트 CSS에 너비를 맡김
+                title_text=f"{user_info['displayName']}의 기간별 변화 분석",
+                hovermode="x unified", # 툴팁을 통합하여 가독성 향상
+                font=dict(size=12),
+                # dragmode="hovermode",
+                showlegend=False
+                # 범례를 차트 하단 중앙에 배치하여 공간 절약 및 가독성 확보
+                # legend=dict(
+                    # orientation="h", 
+                    # yanchor="bottom", 
+                    # y=-0.1, 
+                    # xanchor="center", 
+                    # x=0.5,
+                    # bgcolor="rgba(255, 255, 255, 0.7)",
+                    # bordercolor="lightgray",
+                    # borderwidth=1
+                # )
+            )
+            
+            # 서브플롯 제목 글꼴 크기 조정
+            fig.update_annotations(font_size=30)
+            fig.update_annotations(
+                    # 1. 제목의 가로 위치를 서브플롯의 맨 왼쪽(0.0)으로 설정
+                    x=0.0, 
+                    # 2. 제목 텍스트의 '왼쪽 끝'을 위에서 지정한 x=0.0 좌표에 고정
+                    xanchor='left' 
+            )   
+            user_chart = pio.to_html(fig, 
+                                     full_html=False,
+                                     config={'responsive': True,
+                                     'staticPlot': False,
+                                     'displayModeBar': True,
+                                     'displaylogo': False,
+                                     'modeBarButtonsToRemove': [
+                                             'zoom2d',      # 줌 버튼 제거
+                                             'pan2d',       # 패닝 버튼 제거
+                                             'select2d',    # 선택 버튼 제거 (dragmode='select' 기능 차단)
+                                             'lasso2d',     # 올가미 버튼 제거
+                                             'zoomIn2d',
+                                             'zoomOut2d',
+                                             'autoscale',
+                                             'resetScale2d'
+                                         ]
+                                     }
+                                    )
         try:
             all_users = dp.get_all_users()
         except AttributeError:
@@ -494,7 +498,7 @@ def project_compare_users(projectname):
     log_access('project_compare', projectname)
     try:
         dp = get_data_processor(projectname)
-        timeframe = request.query.get('timeframe', 'TOTAL')
+        timeframe = request.query.get('timeframe', '7D')
         metric = request.query.get('metric', 'snapsPercent')
         users = request.query.getlist('users')
         
@@ -562,7 +566,6 @@ def handle_404(error):
 # 애플리케이션 실행 (Waitress 사용)
 from waitress import serve
                 
-
 if __name__ == '__main__':
     # 1. 프로젝트 초기화
     init_projects_on_startup()
