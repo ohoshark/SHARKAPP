@@ -75,12 +75,23 @@
 	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-
 	<link rel="stylesheet" href="/static/css/leaderboard.css">
-
+	<style>
+			@media (max-width: 767.98px) {
+			.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
+		.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
+		.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
+		.table-responsive td:nth-of-type(4):before { content: "{{t['rank_change']}}"; }
+		.table-responsive td:nth-of-type(5):before { content: "{{t['pre']}} {{_col_metric}}{{t['ms']}}"; }
+		.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{_col_metric}}{{t['ms']}}"; } 
+		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}{{t['ms']}} {{t['change']}}"; } 
+		
+			}
+	</style>
 </head>
+
 <body>
 % include('_navbar.html')
 
@@ -157,8 +168,14 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+		// Check if Bootstrap is loaded
+		if (typeof bootstrap === 'undefined') {
+			console.error('Bootstrap is not loaded!');
+		} else {
+			console.log('Bootstrap version:', bootstrap.Tooltip.VERSION);
+		}
+		
 		// Compressed data - minified for performance
 		const rawTimestamps = {{ !timestamps }};
 		const formattedTimestamps = {{ !formatted_timestamps }};
@@ -264,12 +281,10 @@
 		$(document).ready(function() {
 		// Check if leaderboard table exists
 		const $tableElement = $('#leaderboardTable');
-		if ($tableElement.length === 0) {
-			console.warn('Leaderboard table not found');
-			return;
-		}
-
-		const table = $tableElement.DataTable({
+	let table = null;
+	
+	if ($tableElement.length > 0) {
+		table = $tableElement.DataTable({
 			"paging": false,
 			"info": false,
 			"ordering": true,
@@ -291,45 +306,52 @@
 		let currentSortDirection = 'desc'; 
 
 		const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
-        	const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
-       	 if (defaultSortOption.length) {
-      	      defaultSortOption.text(defaultSortOption.text() + initialIndicator);
-     	 	  }
+		const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
+		if (defaultSortOption.length) {
+			defaultSortOption.text(defaultSortOption.text() + initialIndicator);
+		}
 		$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt'); // 'desc' 방향 아이콘
-			$('.sort-option').on('click', function(e) {
-				e.preventDefault();
-				
-				const requestedColumn = parseInt($(this).data('column'));
-				const defaultDirection = $(this).data('default-dir') || 'desc'; 
-				let newDirection;
-
-				if (requestedColumn === currentSortColumn) {
-					newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
-				} else {
-					newDirection = defaultDirection;
-				}
-
-                $('.sort-option').each(function() {
-                    let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
-                    $(this).text(text);
-                });
-
-				table.order([requestedColumn, newDirection]).draw();
-
-				currentSortColumn = requestedColumn;
-				currentSortDirection = newDirection;
-
-                const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
-                const currentText = $(this).text();
-                $(this).text(currentText + indicator);
-
-				const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
-				$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
-			});
+		
+		$('.sort-option').on('click', function(e) {
+			e.preventDefault();
 			
-		const $usernameInput = $('#usernameInput');
-		const $searchResults = $('#searchResults');
-		const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
+			if (!table) {
+				console.warn('Table not initialized');
+				return;
+			}
+			
+			const requestedColumn = parseInt($(this).data('column'));
+			const defaultDirection = $(this).data('default-dir') || 'desc'; 
+			let newDirection;
+
+			if (requestedColumn === currentSortColumn) {
+				newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
+			} else {
+				newDirection = defaultDirection;
+			}
+
+			$('.sort-option').each(function() {
+				let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
+				$(this).text(text);
+			});
+
+			table.order([requestedColumn, newDirection]).draw();
+
+			currentSortColumn = requestedColumn;
+			currentSortDirection = newDirection;
+
+			const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
+			const currentText = $(this).text();
+			$(this).text(currentText + indicator);
+
+			const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
+			$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
+		});
+	} else {
+		console.warn('Leaderboard table not found - FAB sort will not work');
+	}
+	
+	// User search functionality (always initialize)
 		
 // 기존 코드 부분을 아래와 같이 수정
 function searchUsers(query) {
@@ -396,7 +418,14 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
     });
 
     if ($targetRow && $targetRow.length) {
-        searchModal.hide(); // 이동 전 모달 먼저 닫기
+        searchModal.hide(); // 모달 닫기
+        
+        // Backdrop 강제 제거 및 스크롤 복구
+        setTimeout(function() {
+            $('.modal-backdrop').remove();
+            $('body').removeClass('modal-open');
+            $('body').css({'overflow': 'auto', 'padding-right': ''});
+        }, 100);
         
         setTimeout(function() {
             $('html, body').animate({
@@ -481,6 +510,33 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
     </div>
 </div>
 <script>
+	// Initialize FAB dropdown manually
+	document.addEventListener('DOMContentLoaded', function() {
+		const dropdownButton = document.getElementById('fabSortDropdown');
+		if (dropdownButton) {
+			const dropdown = new bootstrap.Dropdown(dropdownButton, {
+				popperConfig: {
+					placement: 'top-end',
+					modifiers: [
+						{
+							name: 'offset',
+							options: {
+								offset: [0, 8]
+							}
+						}
+					]
+				}
+			});
+			
+			// Manual click handler to force toggle
+			dropdownButton.addEventListener('click', function(e) {
+				console.log('FAB Dropdown clicked');
+				e.stopPropagation();
+				dropdown.toggle();
+			});
+		}
+	});
+
 	const scrollTopButton = document.getElementById('fabScrollTop');
 	const scrollThreshold = 300; 
 
