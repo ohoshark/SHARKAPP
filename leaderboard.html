@@ -71,291 +71,18 @@
 	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">	
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+ 	<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
 	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <style>
-		#creatorModal .modal-content {
-			background-image: url('/static/modal_background.jpg'); /* 배경 이미지 경로 */
-			background-size: cover;      /* 이미지가 요소를 가득 채우도록 */
-			background-position: center; /* 이미지를 중앙에 배치 */
-			background-repeat: no-repeat;
-			position: relative;
-			overflow: hidden; /* 테두리 곡선(border-radius) 밖으로 이미지가 나가지 않게 */
-		}
-		#creatorModal .modal-content::before {
-			content: "";
-			position: absolute;
-			top: 0; left: 0; right: 0; bottom: 0;
-			background: rgba(255, 255, 255, 0.0); /* 흰색 투명도 60% (필요에 따라 조절) */
-			z-index: 0;
-		}
-		/* 모달 내부 콘텐츠가 배경 위로 올라오도록 설정 */
-		#creatorModal .modal-body {
-			position: relative;
-			z-index: 1;
-		}
-		body {
-			background-color: #f8f9fa;
-			/* 이모지 전용 폰트들을 일반 폰트(Pretendard)보다 무조건 앞에 배치합니다. */
-			font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", 'Pretendard', sans-serif !important;
-		}
-        
-        /* 네비게이션 스타일 */
-        .navbar { border-bottom: 1px solid rgba(0,0,0,0.1); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .project-switcher { border: none; font-weight: 800; font-size: 1.1rem; cursor: pointer; background: transparent; padding: 0; }
-        .project-switcher:focus { shadow: none; outline: none; box-shadow: none; }
+	<link rel="stylesheet" href="/static/css/leaderboard.css">
 
-        .creator-badge {
-            display: flex; align-items: center; background: #fff; border: 1px solid #ddd;
-            padding: 4px 12px 4px 6px; border-radius: 25px; cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .creator-badge:hover { background: #f0f0f0; border-color: #00d2ff; transform: translateY(-1px); }
-        .creator-badge img { width: 28px; height: 28px; border-radius: 50%; margin-right: 8px; }
-        .creator-badge span { font-size: 0.85rem; font-weight: 600; color: #333; }
-
-        /* 필터 및 테이블 카드 */
-        .filter-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        
-        /* 지갑 복사 박스 */
-        .donation-card {
-            background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 12px;
-            padding: 12px; cursor: pointer; position: relative;
-        }
-        .donation-card:hover { background: #eefbff; border-color: #00d2ff; }
-	@media (max-width: 767.98px) {
-		.container.mt-4 {
-			padding-bottom: 100px !important; /* FAB 버튼 높이(60px)보다 넉넉하게 줌 */
-		}
-	}
-	.noUi-handle.red-indicator {
-		border-color: #FF0000; 
-		box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.4); 
-	}
-	.fab-custom-size {
-		width: 50px; 
-		height: 50px;
-		padding: 0 !important; 
-		display: flex; 
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-	}
-	.fab-custom-size i {
-		font-size: 1.5rem; 
-		color: white; 
-	}
-	.btn-info.rounded-circle i {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 100%;
-		height: 100%;
-		font-size: 1.5rem; 
-		color: white; 
-	}
-	.btn-info.rounded-circle { 
-		background-color: gray !important; 
-		border-color: gray !important;     
-}
-	
-    
-    
-    .dropdown-menu-end {
-        
-        left: auto !important;
-        right: 0;
-    }
-    
-    
-    .fixed-bottom {
-        padding-right: 20px !important;
-    }
-	@media (max-width: 767.98px) {
-		
-		.table-responsive .table,
-		.table-responsive thead,
-		.table-responsive tbody,
-		.table-responsive th,
-		.table-responsive td,
-		.table-responsive tr {
-			display: block;
-		}
-
-		
-		.table-responsive thead tr {
-			position: absolute;
-			top: -9999px;
-			left: -9999px;
-		}
-
-		
-		.table-responsive tbody tr {
-			border: 1px solid #ccc;
-			margin-bottom: 15px;
-			padding: 10px;
-		}
-
-		
-		.table-responsive td {
-			border: none;
-			border-bottom: 1px solid #eee;
-			position: relative;
-			padding-left: 50% !important; 
-			text-align: right;
-		}
-
-		
-		.table-responsive td:before {
-			
-			position: absolute;
-			left: 6px;
-			width: 45%;
-			padding-right: 10px;
-			white-space: nowrap;
-			text-align: left;
-			font-weight: bold;
-		}
-		
-		
-		.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
-		.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
-		.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
-		.table-responsive td:nth-of-type(4):before { content: "{{t['rank_change']}}"; }
-		.table-responsive td:nth-of-type(5):before { content: "{{t['pre']}} {{_col_metric}}{{t['ms']}}"; }
-		.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{_col_metric}}{{t['ms']}}"; } 
-		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}{{t['ms']}} {{t['change']}}"; } 
-		
-		
-		.table-responsive td:nth-of-type(1) {
-        
-        text-align: left; 
-        
-        padding-left: 5px !important; 
-		}
-		
-		
-		
-		.table-responsive td:nth-of-type(1):before { 
-			display: none; 
-		}
-		
-	}
-		.d-flex.justify-content-end.mt-5 {
-				
-				position: relative; 
-				
-				z-index: 100; 
-			}
-        .timestamp-selector {
-            margin-bottom: 20px;
-        }
-        .comparison-table {
-            margin-top: 30px;
-        }
-        .text-success {
-            color: #28a745 !important;
-            font-weight: bold;
-        }
-        .text-danger {
-            color: #dc3545 !important;
-            font-weight: bold;
-        }
-		.user-link {
-			
-			text-decoration: none; 
-			
-			color: inherit; 
-			
-			 
-		}
-		.timestamp-selector {
-            margin-bottom: 20px;
-        }
-		
-		.user-link:hover {
-			text-decoration: none;
-			color: inherit; 
-		}
-		img.emoji {
-			height: 1em;
-			width: 1em;
-			margin: 0 .05em 0 .1em;
-			vertical-align: -0.1em;
-    </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
-    <div class="container">
-        <div class="d-flex align-items-center">
-            <img src="/static/cookie_shark.png" width="32" height="32" class="me-2">
-        <span class="text-info me-1 fw-bold" style="padding: 5; font-size: 1.2rem; letter-spacing: 1px;">SHARKAPP</span>
-
-		<div class="dropdown">
-			<button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-				<% 
-					# 이모티콘 매핑 사전
-					flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳','pt': '🇵🇹','es': '🇪🇸'}
-					
-					# 뒤에서부터 첫 번째 '-'를 기준으로 한 번만 분리
-					# 예: 'foru-ai-en' -> ['foru-ai', 'en']
-					current_parts = project.rsplit('-', 1)
-					current_name = current_parts[0].upper()
-					current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
-					current_flag = flags.get(current_lang, '')
-				%>
-				{{current_flag}} {{current_name}}
-			</button>
-			<ul class="dropdown-menu shadow border-0" style="padding: 5px;" aria-labelledby="projectDropdown">
-				% for p in all_projects:
-					<% 
-						# 각 프로젝트 목록도 동일하게 뒤에서부터 분리
-						p_parts = p.rsplit('-', 1)
-						p_name = p_parts[0].upper()
-						p_lang = p_parts[1].lower() if len(p_parts) > 1 else ''
-						p_flag = flags.get(p_lang, '')
-					%>
-					<li>
-						<a class="dropdown-item {{'active' if p == project else ''}}" href="/{{p}}/leaderboard">
-							{{p_flag}} {{p_name}}
-						</a>
-					</li>
-				% end
-			</ul>
-		</div>
-        </div>
-
-        
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-lg-4 me-auto">
-                <li class="nav-item">
-					<a class="nav-link {{'active' if current_page == 'user' else ''}}" href="/{{project}}/">{{t['user_analysis']}}</a>
-                </li>
-                <li class="nav-item">
-					<a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="/{{project}}/leaderboard">{{t['leaderboard_analysis']}}</a>
-                </li>
-            </ul>
-					
-            <div class="creator-badge me-2" data-bs-toggle="modal" data-bs-target="#creatorModal">
-                <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
-                <span>Created by ohoshark</span>
-            </div>
-			<div class="btn-group btn-group-sm me-3">
-					<a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
-					<a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
-			</div>
-        </div>
-    </div>
-</nav>
+% include('_navbar.html')
 
     <div class="container mt-4">
         <!-- <h1 class="mb-4">{{project.upper()}} 리더보드 변화 분석</h1> -->
@@ -419,7 +146,7 @@
                 <h3>
                     {{t['result']}} 
                     <small class="text-muted">
-                        ({{ formatted_timestamps.get(timestamp1, timestamp1) }} → {{ formatted_timestamps.get(timestamp2, timestamp2) }})
+                        ({{ timestamp1_display }} → {{ timestamp2_display }})
                     </small>
                 </h3>
             </div>
@@ -432,17 +159,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-		const rawTimestamps = [
-			% for ts in timestamps:
-				"{{ ts }}",
-			% end
-		];
+		// Compressed data - minified for performance
+		const rawTimestamps = {{ !timestamps }};
+		const formattedTimestamps = {{ !formatted_timestamps }};
 
-		const formattedTimestamps = {
-			% for ts_key, ts_value in formatted_timestamps.items():
-				"{{ ts_key }}": "{{ ts_value }}",
-			% end
-		};
 
 		const currentTs1 = "{{ timestamp1 }}";
 		const currentTs2 = "{{ timestamp2 }}";
@@ -542,37 +262,40 @@
 
 
 		$(document).ready(function() {
-			
-			const table = $('#leaderboardTable').DataTable({
-				"paging": false,
-				"info": false,
-				"ordering": true,
-				"searching": false,
-				"language": {
-					"emptyTable": "비교할 데이터가 없습니다.",
-					"zeroRecords": "일치하는 데이터가 없습니다."
-				},
-				"order": [[2, 'asc']], 
-				"columnDefs": [
-					{ "orderable": false, "targets": 0 },
-					{ "orderable": true, "targets": "_all" }
-				]
-			});
-			
-			$('.dataTables_wrapper').addClass('no-footer');
+		// Check if leaderboard table exists
+		const $tableElement = $('#leaderboardTable');
+		if ($tableElement.length === 0) {
+			console.warn('Leaderboard table not found');
+			return;
+		}
 
+		const table = $tableElement.DataTable({
+			"paging": false,
+			"info": false,
+			"ordering": true,
+			"searching": false,
+			"language": {
+				"emptyTable": "비교할 데이터가 없습니다.",
+				"zeroRecords": "일치하는 데이터가 없습니다."
+			},
+			"order": [[2, 'asc']], 
+			"columnDefs": [
+				{ "orderable": false, "targets": 0 },
+				{ "orderable": true, "targets": "_all" }
+			]
+		});
+		
+		$('.dataTables_wrapper').addClass('no-footer');
 
-			let currentSortColumn = 2; 
-			let currentSortDirection = 'desc'; 
+		let currentSortColumn = 2; 
+		let currentSortDirection = 'desc'; 
 
-			const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
-            const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
-            if (defaultSortOption.length) {
-                defaultSortOption.text(defaultSortOption.text() + initialIndicator);
-            }
-			$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt'); // 'desc' 방향 아이콘
-
-
+		const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
+        	const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
+       	 if (defaultSortOption.length) {
+      	      defaultSortOption.text(defaultSortOption.text() + initialIndicator);
+     	 	  }
+		$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt'); // 'desc' 방향 아이콘
 			$('.sort-option').on('click', function(e) {
 				e.preventDefault();
 				
@@ -695,21 +418,22 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
 		});
 	</script>
 
-<div class="fixed-bottom d-flex flex-column align-items-end p-4" style="z-index: 80; left:auto;">
+<div class="fixed-bottom d-flex flex-column align-items-end p-4" style="z-index: 1050; left:auto;">
     <div class="dropdown dropup mb-3">
         <button class="btn btn-primary btn-lg rounded-circle shadow-lg fab-custom-size" 
                 type="button" 
                 id="fabSortDropdown" 
                 data-bs-toggle="dropdown" 
+                data-bs-auto-close="true"
                 aria-expanded="false"
                 style="width: 60px; height: 60px;">
             <i class="fas fa-sort-amount-down-alt"></i>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown" style="z-index: 1051; position: absolute; bottom: 100%; margin-bottom: 0.5rem;">
             <li class="dropdown-header">정렬 기준 선택</li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">{{t['pre_rank']}}</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">{{t['pre_rank']}}</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="asc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="asc">{{t['curr_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">{{t['rank_change']}}</a></li>
             <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">{{t['pre']}} {{ metric_display_name }}</a></li>
             <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">{{t['cur']}} {{ metric_display_name }}</a></li>
             <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{ metric_display_name }} {{t['change']}}</a></li>
@@ -733,52 +457,8 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
         </button> 
     </div>
 </div>
-<div class="modal fade" id="creatorModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow-lg" 
-			style="border-radius: 20px; 
-						background-image: url('/static/modal_background.jpg'); 
-						background-position: center -110px; 
-						background-repeat: repeat; 
-						background-size: 120% auto; 
-						overflow: hidden;">
-            <div class="modal-body text-center p-4">
-				<div style="height: 120px;"></div>
-                <h3 class="fw-bold mb-0" style="font-weight: 900 !important; font-size: 2rem;">ohoshark</h3>
-                <p class="text-muted fw-bold small mb-3">@racoooncom</p>
-                
-                <div class="d-flex justify-content-center gap-2 mb-1">
-                    <a href="https://x.com/racoooncom" target="_blank" class="btn btn-dark btn-sm rounded-pill w-100"><i class="fab fa-twitter"></i></a>
-                    <a href="https://t.me/ohoshark" target="_blank" class="btn btn-primary btn-sm rounded-pill w-100" style="background-color: #0088cc; border:none;"><i class="fab fa-telegram-plane"></i></a>
-                </div>
 
-                <div class="donation-card mb-2" onclick="copyWalletAddress()">
-                    <div class="text-info fw-bold mb-1" style="font-size: 0.7rem;">ENS DONATION</div>
-                    <div class="fw-bold text-dark">ohoshark.eth</div>
-                    <div class="text-muted mt-1" style="font-size: 0.65rem;">{{t['click_to_copy']}}</div>
-                </div>
-				<div class="mb-0">
-					<a href="https://rul.kr/Xtracker" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill w-100 fw-bold shadow-sm custom-cookie-btn" style="background-color: #aaf0d1; font-size: 0.8rem; border-width: 1px; color: #000; padding: 8px 15px; line-height: 1.2;">
-						
-						🍪 Cookie.fun X Tracker <br>
-						<span style="font-size: 0.65rem; font-weight: normal; opacity: 0.8;">by @baegseungh7061</span>
-						
-					</a>
-				</div>
-				<div class="toast-container position-absolute bottom-0 start-50 translate-middle-x p-3">
-				<div id="copyToast" class="toast align-items-center text-white border-0 shadow-lg" 
-					 role="alert" aria-live="assertive" aria-atomic="true" 
-					 style="border-radius: 12px; background-color: rgba(0, 0, 0, 0.7); min-height: auto;"> <div class="d-flex justify-content-center">
-						<div class="toast-body text-center p-2" style="font-size: 0.85rem; line-height: 1.2;">
-							{{t['copy_success']}}
-						</div>
-					</div>
-				</div>
-				</div>
-            </div>
-        </div>
-    </div>
-</div>
+% include('_footer.html')
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -803,7 +483,6 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
 <script>
 	const scrollTopButton = document.getElementById('fabScrollTop');
 	const scrollThreshold = 300; 
-
 
 	window.addEventListener('scroll', function() {
 		if (window.scrollY > scrollThreshold) {
@@ -877,5 +556,7 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
     twemoji.parse(document.body);
   });
 </script>
+
 </body>
+
 </html>

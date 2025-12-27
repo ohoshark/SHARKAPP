@@ -1,0 +1,60 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
+    <div class="container">
+        <div class="d-flex align-items-center">
+            <img src="/static/cookie_shark.png" width="32" height="32" class="me-2">
+            <span class="text-info me-1 fw-bold" style="padding: 5; font-size: 1.2rem; letter-spacing: 1px;">SHARKAPP</span>
+
+            <div class="dropdown">
+                <button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <% 
+                        flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                        current_parts = project.rsplit('-', 1)
+                        current_name = current_parts[0].upper()
+                        current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
+                        current_flag = flags.get(current_lang, '')
+                    %>
+                    {{current_flag}} {{current_name}}
+                </button>
+                <ul class="dropdown-menu shadow border-0" style="padding: 5px;" aria-labelledby="projectDropdown">
+                    % for p in all_projects:
+                        <% 
+                            p_parts = p.rsplit('-', 1)
+                            p_name = p_parts[0].upper()
+                            p_lang = p_parts[1].lower() if len(p_parts) > 1 else ''
+                            p_flag = flags.get(p_lang, '')
+                        %>
+                        <li>
+                            <a class="dropdown-item {{'active' if p == project else ''}}" href="/{{p}}/leaderboard">
+                                {{p_flag}} {{p_name}}
+                            </a>
+                        </li>
+                    % end
+                </ul>
+            </div>
+        </div>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-lg-4 me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="/{{project}}/">{{t['user_analysis']}}</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="/{{project}}/leaderboard">{{t['leaderboard_analysis']}}</a>
+                </li>
+            </ul>
+                    
+            <div class="creator-badge me-2" data-bs-toggle="modal" data-bs-target="#creatorModal">
+                <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
+                <span>Created by ohoshark</span>
+            </div>
+            <div class="btn-group btn-group-sm me-3">
+                <a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
+                <a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
+            </div>
+        </div>
+    </div>
+</nav>

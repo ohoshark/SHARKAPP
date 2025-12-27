@@ -1,4 +1,4 @@
-from bottle import Bottle, route, run, template, static_file, request, redirect, response, abort
+from bottle import Bottle, route, run, template, static_file, request, redirect, response, abort, TEMPLATE_PATH
 from concurrent.futures import ThreadPoolExecutor  # 상단에 추가
 import os
 import json
@@ -13,6 +13,11 @@ from datetime import datetime
 from data_processor import DataProcessor
 
 app = Bottle()
+
+# 템플릿 경로 설정 (views 폴더와 루트 폴더 모두 포함)
+TEMPLATE_PATH.insert(0, './views/')
+TEMPLATE_PATH.insert(0, './')
+
 base_data_dir = './data/'  # 기본 데이터 디렉토리
 
 # 프로젝트별 DataProcessor 인스턴스 관리
@@ -82,19 +87,29 @@ def get_data_processor(project_name):
         raise ValueError(f"Project '{project_name}' not found or not registered.")
     
     return project_instances[project_name]
-
-
 def start_data_loader_thread(project_name):
     def project_periodic_loader():
         processor = project_instances[project_name]
+        
+        # 최초 실행 시 모든 데이터 로드
+        try:
+            print(f"[{project_name}] 초기 데이터 로드 시작...")
+            processor.load_data()
+            print(f"[{project_name}] ✅ 초기 데이터 로드 완료")
+        except Exception as e:
+            print(f"[{project_name}] ❌ 초기 데이터 로드 오류: {e}")
+        
+        # 주기적으로 신규 파일 체크
         while True:
             try:
+                time.sleep(30)
                 new_files = processor.check_for_new_data()
                 if new_files:
+                    print(f"[{project_name}] 신규 데이터 발견, 로드 중...")
                     processor.load_data(files_to_load=new_files)
+                    print(f"[{project_name}] ✅ 신규 데이터 로드 완료")
             except Exception as e:
                 print(f"[{project_name}] 데이터 로드 오류: {e}")
-            time.sleep(30)
 
     thread = threading.Thread(target=project_periodic_loader, daemon=True)
     thread.start()
@@ -115,24 +130,24 @@ def init_projects_on_startup():
             lang_path = os.path.join(project_path, lang)
             
             if os.path.isdir(lang_path) and not lang.startswith('_'):
-                # [수정] URL로 사용될 ID (괄호 대신 하이픈 사용)
                 project_id = f"{project_name}-{lang}" 
-                
-                # [수정] 화면에 표시될 예쁜 이름 (예: spaace (KO))
                 friendly_name = f"{project_name} ({lang.upper()})"
                 
+                # 1. DataProcessor 생성 (내부에서 DB 연결 및 테이블 생성됨)
                 dp = DataProcessor(lang_path)
-                dp.load_data()
                 
-                # 객체 내부에 표시용 이름을 저장해두면 나중에 템플릿에서 쓰기 편합니다.
+                # 2. 초기 데이터 로드는 백그라운드 스레드에서 처리
+                # (웹서버를 먼저 시작하고 데이터는 나중에 로드)
+                
                 dp.project_display_title = friendly_name 
                 dp.project_name = f"{project_name}"
                 dp.lang = f"{lang}"
                 
                 project_instances[project_id] = dp
                 
+                # 3. 백그라운드 스레드 시작 (초기 데이터 로드 + 주기적으로 신규 파일 체크)
                 start_data_loader_thread(project_id)
-                print(f"🚀 Registered: {project_id} as '{friendly_name}'")
+                print(f"🚀 Registered: {project_id} as '{friendly_name}' (데이터 로드 중...)")
                 
 def render_error(error_message, project_name=None):
     try:
@@ -414,9 +429,9 @@ def project_leaderboard(projectname):
                                 </div>
                             </div>
                         </td>
-                        <td>{row.prev_rank}</td>
-                        <td>{row.curr_rank}</td>
-                        <td class="{rank_change_class}">{row.rank_change_display}</td>
+                        <td>{int(row.prev_rank)}</td>
+                        <td>{int(row.curr_rank)}</td>
+                        <td class="{rank_change_class}">{int(row.rank_change)}</td>
                         <td>{prev_mindshare_value:.4f}</td>
                         <td>{curr_mindshare_value:.4f}</td>
                         <td class="{mindshare_change_class}">{row.mindshare_change_display}</td>
@@ -439,6 +454,11 @@ def project_leaderboard(projectname):
                 formatted_timestamps[ts] = dt.strftime('%Y-%m-%d %H:%M')
             except:
                 formatted_timestamps[ts] = ts
+        
+        # Display용 timestamp 계산
+        timestamp1_display = formatted_timestamps.get(timestamp1, timestamp1)
+        timestamp2_display = formatted_timestamps.get(timestamp2, timestamp2)
+        
         all_projects = get_cached_projects()
         display_project_name = dp.project_name
         # {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
@@ -454,13 +474,15 @@ def project_leaderboard(projectname):
                        all_projects=all_projects,
                        timeframe=timeframe,
                        timeframes=dp.timeframes,
-                       timestamps=timestamps,
+                       timestamps=json.dumps(timestamps),
                        metric=metric, # 👈 이 줄을 추가해야 합니다.
                        metric_display_name=metric_display_name,
                        _col_metric=_col_metric,
-                       formatted_timestamps=formatted_timestamps,
+                       formatted_timestamps=json.dumps(formatted_timestamps),
                        timestamp1=timestamp1,
                        timestamp2=timestamp2,
+                       timestamp1_display=timestamp1_display,
+                       timestamp2_display=timestamp2_display,
                        table_html=table_html)
     except ValueError as e:
         return render_error(str(e), projectname)
@@ -485,12 +507,23 @@ def project_user_analysis(projectname,username):
         
         # URL 쿼리 파라미터에서 metric 가져오기
         metric = request.query.get('metric', 'snapsPercent')
-        timeframe='TOTAL'
-        # timeframe = request.query.get('timeframe', dp.timeframes[0])
+        timeframe = 'total'
+        user_info_by_timeframe = {}
+        for tf in dp.timeframes:
+            user_info_by_timeframe[tf] = dp.get_user_info_by_timeframe(username, tf)
+
+        # 현재 선택된 metric에 따라 기본으로 보여줄 timeframe의 user_info를 설정
+        # user_info = user_info_by_timeframe.get(timeframe, {})
+        # if not user_info:
+        #     user_info = dp.get_user_info(username) # Total 정보가 없으면, 최신 사용자 정보 가져옴
         
-        user_info = dp.get_user_info_by_timeframe(username, timeframe)
+        # 기본적으로 TOTAL 데이터를 사용하되, 특정 timeframe을 선택하지 않은 경우
+        user_info = user_info_by_timeframe['TOTAL']
+        if not user_info:
+            user_info = dp.get_user_info(username) # Total 정보가 없으면, 최신 사용자 정보 가져옴
+        
         if lang=='ko':
-            title = f"{user_info['displayName']}의 기간별 변화 분석"
+            title = f"{user_info.get('displayName', username)}의 기간별 변화 분석"
             rank = f"순위"
         else:
             title = f"{user_info['displayName']}'s changes over time"
@@ -657,10 +690,11 @@ def project_user_analysis(projectname,username):
                        username=username,
                        user_chart=user_chart,
                        user_info=user_info,
-                       all_users=all_users,
+                       all_users=json.dumps(all_users), # JSON 문자열로 변환
                        timeframe=timeframe,
                        metric=metric, 
                        timeframes=dp.timeframes,
+                       user_info_by_timeframe=user_info_by_timeframe,
                        rank_col=rank_col,
                        mindshare_col = mindshare_col,
                        json=json)
@@ -742,11 +776,22 @@ def handle_404(error):
 from waitress import serve
                 
 if __name__ == '__main__':
-    # 1. 프로젝트 초기화
-    init_projects_on_startup()
+    print("\n" + "="*60)
+    print("🦈 SHARKAPP 서버 시작 중...")
+    print("="*60)
+    
+    # 1. 백그라운드 스레드에서 프로젝트 초기화
+    init_thread = threading.Thread(target=init_projects_on_startup, daemon=True)
+    init_thread.start()
+    print("📂 프로젝트 초기화를 백그라운드에서 진행합니다...")
+    
+    print("\n" + "="*60)
+    print("🌐 Waitress Server Running on http://0.0.0.0:8080")
+    print("📊 데이터는 백그라운드에서 로드 중입니다...")
+    print("="*60 + "\n")
+    
     try:
-        print("Waitress Server Running on http://0.0.0.0:8080")
-        # Waitress로 서버 구동 시 host='0.0.0.0' 및 threads=4 설정으로 다중 접속을 지원합니다.
+        # Waitress로 서버 구동 시 host='0.0.0.0' 및 threads=50 설정으로 다중 접속을 지원합니다.
         serve(app, host='0.0.0.0', port=8080, threads=50)
     except KeyboardInterrupt:
         print("\n[시스템] 종료 중... 모든 프로세스를 강제 종료합니다.")
