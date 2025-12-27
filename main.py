@@ -1,4 +1,5 @@
 from bottle import Bottle, route, run, template, static_file, request, redirect, response, abort
+from concurrent.futures import ThreadPoolExecutor  # 상단에 추가
 import os
 import json
 import pandas as pd
@@ -93,16 +94,20 @@ def start_data_loader_thread(project_name):
     print(f"[{project_name}] 데이터 로더 스레드 시작")
 
 def init_projects_on_startup():
-    """서버 시작 시 data 디렉토리 스캔하여 모든 프로젝트 초기화"""
-    for project_name in os.listdir(base_data_dir):
-        project_path = os.path.join(base_data_dir, project_name)
-        if os.path.isdir(project_path):
-            try:
-                # 프로젝트 인스턴스 강제 생성
-                get_data_processor(project_name)
-                print(f"[자동 로드] {project_name} 프로젝트 초기화 완료")
-            except Exception as e:
-                print(f"[오류] {project_name} 프로젝트 로드 실패: {str(e)}")
+    """서버 시작 시 data 디렉토리 스캔하여 모든 프로젝트를 병렬로 초기화"""
+    project_names = [
+        name for name in os.listdir(base_data_dir) 
+        if os.path.isdir(os.path.join(base_data_dir, name))
+    ]
+    
+    print(f"[시스템] 총 {len(project_names)}개 프로젝트 초기화 시작 (병렬 처리)")
+
+    # CPU 코어 수에 맞춰 적절한 thread 개수 설정 (예: 4~8개)
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        # get_data_processor 함수를 각 프로젝트명에 대해 병렬 실행
+        executor.map(get_data_processor, project_names)
+
+    print("[시스템] 모든 프로젝트 초기화 완료")
                 
 def render_error(error_message, project_name=None):
     try:
@@ -121,6 +126,9 @@ def render_error(error_message, project_name=None):
 @app.route('/<projectname>/static/<filepath:path>')
 def serve_project_static(projectname, filepath):
     return static_file(filepath, root='./static')
+@app.route('/static/<filename:path>')
+def send_static(filename):
+    return static_file(filename, root='./static') # 또는 이미지가 저장된 폴더명
 # robots.txt 요청을 처리하는 라우트 추가
 @app.route('/robots.txt')
 def robots():
@@ -132,12 +140,23 @@ def favicon():
     # 실제 static 폴더 경로에 맞게 수정하세요.
     # print("--- DEBUG: Favicon 라우트 호출됨 ---")
     return static_file('favicon.ico', root='./static')
+
+@app.route('/ref')
 @app.route('/')
 def home_redirect():
     """
     루트 경로 접근 시 DEFAULT_PROJECT로 강제 리디렉션
     """
-    log_access('home_redirect', "UNKNOWN")
+    # 1. 어떤 경로로 들어왔는지 확인
+    path = request.path
+    
+    if path == '/ref':
+        # print("[로그] 리퍼럴 경로(/ref)를 통해 접속함")
+        log_access('home_redirect', "ref")
+        # 리퍼럴 전용 처리가 필요하다면 여기서 수행
+    else:
+        # print("[로그] 기본 경로(/)를 통해 접속함")
+        log_access('home_redirect', "UNKNOWN")
     # HTTP 상태 코드 302 (Found) 또는 301 (Moved Permanently)와 함께 리디렉션
     return redirect(f'/vooi/leaderboard', code=302)
 @app.route('/leaderboard')
@@ -454,6 +473,7 @@ def project_user_analysis(projectname,username):
             )   
             user_chart = pio.to_html(fig, 
                                      full_html=False,
+                                     include_plotlyjs='cdn',
                                      config={'responsive': True,
                                      'staticPlot': False,
                                      'displayModeBar': True,
@@ -569,6 +589,11 @@ from waitress import serve
 if __name__ == '__main__':
     # 1. 프로젝트 초기화
     init_projects_on_startup()
-    print("Waitress Server Running on http://0.0.0.0:8080")
-    # Waitress로 서버 구동 시 host='0.0.0.0' 및 threads=4 설정으로 다중 접속을 지원합니다.
-    serve(app, host='0.0.0.0', port=8080, threads=50)
+    try:
+        print("Waitress Server Running on http://0.0.0.0:8080")
+        # Waitress로 서버 구동 시 host='0.0.0.0' 및 threads=4 설정으로 다중 접속을 지원합니다.
+        serve(app, host='0.0.0.0', port=8080, threads=50)
+    except KeyboardInterrupt:
+        print("\n[시스템] 종료 중... 모든 프로세스를 강제 종료합니다.")
+        import os
+        os._exit(0) # 👈 데몬 스레드 무시하고 즉시 종료

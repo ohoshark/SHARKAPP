@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>리더보드 분석 - 스내퍼 분석</title>
+    <title>{{project.upper()}} 리더보드 분석 - SHARKAPP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
@@ -14,6 +14,56 @@
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
     <style>
+		#creatorModal .modal-content {
+			background-image: url('/static/modal_background.jpg'); /* 배경 이미지 경로 */
+			background-size: cover;      /* 이미지가 요소를 가득 채우도록 */
+			background-position: center; /* 이미지를 중앙에 배치 */
+			background-repeat: no-repeat;
+			position: relative;
+			overflow: hidden; /* 테두리 곡선(border-radius) 밖으로 이미지가 나가지 않게 */
+		}
+		#creatorModal .modal-content::before {
+			content: "";
+			position: absolute;
+			top: 0; left: 0; right: 0; bottom: 0;
+			background: rgba(255, 255, 255, 0.0); /* 흰색 투명도 60% (필요에 따라 조절) */
+			z-index: 0;
+		}
+		/* 모달 내부 콘텐츠가 배경 위로 올라오도록 설정 */
+		#creatorModal .modal-body {
+			position: relative;
+			z-index: 1;
+		}
+		body {
+			background-color: #f8f9fa;
+			/* 이모지 전용 폰트들을 일반 폰트(Pretendard)보다 무조건 앞에 배치합니다. */
+			font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", 'Pretendard', sans-serif !important;
+		}
+        
+        /* 네비게이션 스타일 */
+        .navbar { border-bottom: 1px solid rgba(0,0,0,0.1); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .project-switcher { border: none; font-weight: 800; font-size: 1.1rem; cursor: pointer; background: transparent; padding: 0; }
+        .project-switcher:focus { shadow: none; outline: none; box-shadow: none; }
+
+        .creator-badge {
+            display: flex; align-items: center; background: #fff; border: 1px solid #ddd;
+            padding: 4px 12px 4px 6px; border-radius: 25px; cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .creator-badge:hover { background: #f0f0f0; border-color: #00d2ff; transform: translateY(-1px); }
+        .creator-badge img { width: 28px; height: 28px; border-radius: 50%; margin-right: 8px; }
+        .creator-badge span { font-size: 0.85rem; font-weight: 600; color: #333; }
+
+        /* 필터 및 테이블 카드 */
+        .filter-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        /* 지갑 복사 박스 */
+        .donation-card {
+            background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 12px;
+            padding: 12px; cursor: pointer; position: relative;
+        }
+        .donation-card:hover { background: #eefbff; border-color: #00d2ff; }
 	@media (max-width: 767.98px) {
 		.container.mt-4 {
 			padding-bottom: 100px !important; /* FAB 버튼 높이(60px)보다 넉넉하게 줌 */
@@ -171,50 +221,54 @@
     </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
     <div class="container">
-        
         <div class="d-flex align-items-center">
-            
-        <a class="navbar-brand" href="/{{current_project}}/">쿠키 스내퍼 분석</a>
+            <img src="/static/cookie_shark.png" width="32" height="32" class="me-2">
+        <span class="text-info me-1 fw-bold" style="padding: 5; font-size: 1.2rem; letter-spacing: 1px;">SHARKAPP</span>
+
+            <div class="dropdown">
+                <button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    {{project.upper()}}
+                </button>
+                <ul class="dropdown-menu shadow border-0" style="padding: 5;" aria-labelledby="projectDropdown">
+                    <li><a class="dropdown-item" href="/vooi/leaderboard">VOOI</a></li>
+                    <li><a class="dropdown-item" href="/spaace/leaderboard">SPAACE</a></li>
+                    <li><a class="dropdown-item" href="/superform/leaderboard">SUPERFORM</a></li>
+                    <li><a class="dropdown-item" href="/rayls/leaderboard">RAYLS</a></li>
+                </ul>
+            </div>
         </div>
-		<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+
+        
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav"> <li class="nav-item">
+            <ul class="navbar-nav ms-lg-4 me-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="/{{current_project}}/">사용자 분석</a>
+                    <a class="nav-link" href="/{{project}}/">사용자 분석</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/{{current_project}}/compare">사용자 비교</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link active" href="/{{current_project}}/leaderboard">리더보드 분석</a>
+                    <a class="nav-link active" href="/{{project}}/leaderboard">리더보드 분석</a>
                 </li>
             </ul>
-        </div>
-		            <div class="dropdown me-3"> 
-                <button class="btn btn-dark dropdown-toggle" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    {{ current_project.upper() }}
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="projectDropdown">
-                    <li><a class="dropdown-item" href="/vooi/{{current_page}}">VOOI</a></li>
-                    <li><a class="dropdown-item" href="/spaace/{{current_page}}">SPAACE</a></li>
-                    <li><a class="dropdown-item" href="/superform/{{current_page}}">SUPERFORM</a></li>
-                    <li><a class="dropdown-item" href="/rayls/{{current_page}}">RAYLS</a></li>
-                </ul>
+            
+            <div class="creator-badge" data-bs-toggle="modal" data-bs-target="#creatorModal">
+                <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
+                <span>Created by ohoshark</span>
             </div>
+        </div>
     </div>
 </nav>
 
     <div class="container mt-4">
-        <h1 class="mb-4">{{project.upper()}} 리더보드 변화 분석</h1>
+        <!-- <h1 class="mb-4">{{project.upper()}} 리더보드 변화 분석</h1> -->
         
         <div class="card timestamp-selector">
             <div class="card-header">
-                <h3>비교할 시간대 선택</h3>
+                <h3>{{project.upper()}} 리더보드 변화 분석</h3>
             </div>
 				<div class="card-body">
 					<form method="get" action="/{{project}}/leaderboard" id="comparisonForm">
@@ -587,7 +641,52 @@
         </button> 
     </div>
 </div>
+<div class="modal fade" id="creatorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg" 
+			style="border-radius: 20px; 
+						background-image: url('/static/modal_background.jpg'); 
+						background-position: center -110px; 
+						background-repeat: repeat; 
+						background-size: 120% auto; 
+						overflow: hidden;">
+            <div class="modal-body text-center p-4">
+				<div style="height: 120px;"></div>
+                <h3 class="fw-bold mb-0" style="font-weight: 900 !important; font-size: 2rem;">ohoshark</h3>
+                <p class="text-muted fw-bold small mb-3">@racoooncom</p>
+                
+                <div class="d-flex justify-content-center gap-2 mb-1">
+                    <a href="https://x.com/racoooncom" target="_blank" class="btn btn-dark btn-sm rounded-pill w-100"><i class="fab fa-twitter"></i></a>
+                    <a href="https://t.me/ohoshark" target="_blank" class="btn btn-primary btn-sm rounded-pill w-100" style="background-color: #0088cc; border:none;"><i class="fab fa-telegram-plane"></i></a>
+                </div>
 
+                <div class="donation-card mb-2" onclick="copyWalletAddress()">
+                    <div class="text-info fw-bold mb-1" style="font-size: 0.7rem;">ENS DONATION</div>
+                    <div class="fw-bold text-dark">ohoshark.eth</div>
+                    <div class="text-muted mt-1" style="font-size: 0.65rem;">클릭하여 주소 복사 🦈</div>
+                </div>
+				<div class="mb-0">
+					<a href="https://rul.kr/Xtracker" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill w-100 fw-bold shadow-sm custom-cookie-btn" style="background-color: #aaf0d1; font-size: 0.8rem; border-width: 1px; color: #000; padding: 8px 15px; line-height: 1.2;">
+						
+						🍪 Cookie.fun X Tracker <br>
+						<span style="font-size: 0.65rem; font-weight: normal; opacity: 0.8;">by @baegseungh7061</span>
+						
+					</a>
+				</div>
+				<div class="toast-container position-absolute bottom-0 start-50 translate-middle-x p-3">
+				<div id="copyToast" class="toast align-items-center text-white border-0 shadow-lg" 
+					 role="alert" aria-live="assertive" aria-atomic="true" 
+					 style="border-radius: 12px; background-color: rgba(0, 0, 0, 0.7); min-height: auto;"> <div class="d-flex justify-content-center">
+						<div class="toast-body text-center p-2" style="font-size: 0.85rem; line-height: 1.2;">
+							지갑 주소가 복사되었습니다! 🦈
+						</div>
+					</div>
+				</div>
+				</div>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered"> <div class="modal-content">
       <div class="modal-header">
@@ -627,6 +726,24 @@
 			scrollTop: 0
 		}, 500); 
 	});
+	function copyWalletAddress() {
+		const addr = "0xC8e695B30EF512AE634007efa89A75E1421e3055";
+		
+		navigator.clipboard.writeText(addr).then(() => {
+			// 토스트 요소 가져오기
+			const toastElement = document.getElementById('copyToast');
+			
+			// Bootstrap 토스트 인스턴스 생성 및 실행
+			const toast = new bootstrap.Toast(toastElement, {
+				autohide: true,
+				delay: 1000 // 2초 뒤 자동 사라짐
+			});
+			toast.show();
+		}).catch(err => {
+			console.error('복사 실패:', err);
+		});
+	}
+	</script>
 </script>
 </body>
 </html>

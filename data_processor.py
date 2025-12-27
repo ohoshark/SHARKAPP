@@ -1,6 +1,8 @@
 import os
+import orjson  # json 대신 orjson 임포트
 import json
 import pandas as pd
+import pickle  # 캐시 저장을 위해 추가
 import numpy as np
 from datetime import datetime
 import glob
@@ -13,95 +15,115 @@ class DataProcessor:
         self.data = {}
         self.user_data = {}
         self.trends = {}
-        self.latest_file = {} # ⭐ 추가: 가장 최근 로드된 파일명을 저장
+        self.latest_file = {}
+        # 캐시 파일 경로 설정
+        self.cache_dir = os.path.join(data_dir, '_cache')
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
+    def get_cache_path(self, timeframe):
+        return os.path.join(self.cache_dir, f"{timeframe}_cache.pkl")
 
     def load_data(self, files_to_load=None):
         """
-        [수정됨] files_to_load가 None이면 모든 파일을 로드하고, 
-        특정 파일 목록이 주어지면 해당 파일만 로드합니다.
+        캐시가 있다면 먼저 로드하고, 새로운 파일만 추가로 읽어 병합합니다.
         """
-        if files_to_load is None:
-            # 초기 로딩 시 모든 파일을 로드
-            files_to_load = defaultdict(list)
-            for timeframe in self.timeframes:
-                path = os.path.join(self.data_dir, timeframe)
-                # print(path)
-                files_to_load[timeframe] = sorted(glob.glob(os.path.join(path, "*.json")))
-                
-            # 초기 로딩 시 기존 데이터 프레임 초기화
-            self.data = {}
-        
         new_data_loaded = False
         
+        # 1. 초기 로드 시 캐시 파일 먼저 확인
+        if files_to_load is None:
+            for timeframe in self.timeframes:
+                cache_path = self.get_cache_path(timeframe)
+                if os.path.exists(cache_path):
+                    try:
+                        with open(cache_path, 'rb') as f:
+                            cache_data = pickle.load(f)
+                            self.data[timeframe] = cache_data['df']
+                            self.latest_file[timeframe] = cache_data['latest_file']
+                        print(f"[{timeframe}] 캐시 로드 완료 (마지막 파일: {self.latest_file[timeframe]})")
+                    except Exception as e:
+                        print(f"[{timeframe}] 캐시 로드 실패: {e}")
+            
+            # 캐시 로드 후 새로 추가된 파일이 있는지 확인
+            files_to_load = self.check_for_new_data()
+
+        # 2. 새로운 파일 처리
         for timeframe in self.timeframes:
             if timeframe not in files_to_load or not files_to_load[timeframe]:
                 continue
 
-            timeframe_data = []
-            
-            # files_to_load에 있는 파일만 처리
+            timeframe_data_list = []
             for file in files_to_load[timeframe]:
                 try:
-                    # 파일명에서 타임스탬프 추출
                     filename = os.path.basename(file)
-                    timestamp = datetime.strptime(filename.split('_')[0] + '_' + filename.split('_')[1], 
-                                                '%Y%m%d_%H%M%S')
+                    # 파일명 형식: 20231027_120000_...
+                    ts_part = filename.split('_')[0] + '_' + filename.split('_')[1]
+                    timestamp = datetime.strptime(ts_part, '%Y%m%d_%H%M%S')
                     
-                    with open(file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+                    with open(file, 'rb') as f:
+                        data = orjson.loads(f.read())
                         
-                    # 데이터에 타임스탬프 추가
                     if 'result' in data and 'data' in data['result'] and 'json' in data['result']['data']:
                         snaps_data = data['result']['data']['json'].get('snaps', [])
+                        formatted_ts = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                        
                         for snap in snaps_data:
-                            snap['timestamp'] = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                            timeframe_data.append(snap)
+                            snap['timestamp'] = formatted_ts
+                            timeframe_data_list.append(snap)
                         
-                        # ⭐ 로드 성공 시 최신 파일명 업데이트
-                        self.latest_file[timeframe] = filename
+                        self.latest_file[timeframe] = filename # 최신 파일명 갱신
                         new_data_loaded = True
-                        
                 except Exception as e:
                     print(f"Error loading {file}: {e}")
-            
-            # 새로 로드한 데이터가 있다면, 기존 데이터프레임에 추가 (병합)
-            new_df = pd.DataFrame(timeframe_data)
-            if timeframe in self.data and not self.data[timeframe].empty and not new_df.empty:
-                # 기존 데이터와 새로 로드된 데이터를 합칩니다.
-                self.data[timeframe] = pd.concat([self.data[timeframe], new_df], ignore_index=True)
-                # 합친 후 중복 제거 및 정렬
+
+            if timeframe_data_list:
+                new_df = pd.DataFrame(timeframe_data_list)
+                if timeframe in self.data and not self.data[timeframe].empty:
+                    self.data[timeframe] = pd.concat([self.data[timeframe], new_df], ignore_index=True)
+                else:
+                    self.data[timeframe] = new_df
+                
+                # 중복 제거 및 정렬
                 self.data[timeframe].drop_duplicates(subset=['username', 'timestamp'], keep='last', inplace=True)
                 self.data[timeframe].sort_values('timestamp', inplace=True)
-                
-            elif not new_df.empty:
-                # 최초 로드 또는 기존 데이터가 없으면 새 데이터프레임으로 설정
-                self.data[timeframe] = new_df
+
+                # 3. 변경된 데이터를 캐시에 즉시 저장
+                self.save_cache(timeframe)
             
         if new_data_loaded:
-            # 데이터가 갱신되었으면 사용자별/트렌드 데이터도 갱신
             self.process_user_data()
             self.process_trend_data()
             
         return self.data
 
+    def save_cache(self, timeframe):
+        """데이터프레임과 마지막 로드 파일명을 피클로 저장"""
+        try:
+            cache_path = self.get_cache_path(timeframe)
+            with open(cache_path, 'wb') as f:
+                pickle.dump({
+                    'df': self.data[timeframe],
+                    'latest_file': self.latest_file.get(timeframe, '')
+                }, f)
+            # print(f"[{timeframe}] 캐시 저장 완료")
+        except Exception as e:
+            print(f"[{timeframe}] 캐시 저장 실패: {e}")
+
     def check_for_new_data(self):
-        """
-        [새로 추가] 새로운 데이터 파일 목록을 반환합니다.
-        새로운 파일이 없으면 빈 딕셔너리를 반환합니다.
-        """
+        """기존 latest_file 이후의 파일만 탐색"""
         new_files_to_load = defaultdict(list)
         is_new_data_found = False
         
         for timeframe in self.timeframes:
             path = os.path.join(self.data_dir, timeframe)
-            all_files = sorted(glob.glob(os.path.join(path, "*.json")))
+            if not os.path.exists(path): continue
             
+            all_files = sorted(glob.glob(os.path.join(path, "*.json")))
             current_latest = self.latest_file.get(timeframe, '')
             
-            # 현재 로드된 파일보다 이름순(시간순)으로 뒤에 있는 파일만 필터링
             for file in all_files:
                 filename = os.path.basename(file)
-                if filename > current_latest:
+                if filename > current_latest: # 문자열 정렬로 시간 순서 비교 가능
                     new_files_to_load[timeframe].append(file)
                     is_new_data_found = True
             
@@ -141,17 +163,27 @@ class DataProcessor:
                 return latest_df.sort_values(by=metric, ascending=False).head(n)
         
         return pd.DataFrame()
-    
+
     def get_user_history(self, username, timeframe='TOTAL'):
-        """특정 사용자의 시간에 따른 데이터를 반환합니다"""
         if timeframe in self.user_data and username in self.user_data[timeframe]:
-            history = self.user_data[timeframe][username]
-             #데이터가 많을 경우 샘플링 (시각화 성능 향상용)
-            # if len(history) > 100:
-                # return history.iloc[::len(history)//100]
+            history = self.user_data[timeframe][username].copy()
+            
+            if history.empty:
+                return pd.DataFrame()
+
+            # 1. timestamp를 datetime 객체로 변환 (정렬 및 샘플링을 위해 필수)
+            history['timestamp'] = pd.to_datetime(history['timestamp'])
+            history.sort_values('timestamp', inplace=True)
+
+            # 2. 데이터가 많을 경우 샘플링 (최대 500개로 제한)
+            # 포인트가 500개 정도면 시각적으로 충분히 상세하면서도 렌더링이 매우 빠릅니다.
+            if len(history) > 500:
+                # 인덱스를 활용해 균등하게 샘플링
+                indices = np.linspace(0, len(history) - 1, 500).astype(int)
+                history = history.iloc[indices]
+            
             return history
         return pd.DataFrame()
-    # data_processor.py 파일 내 DataProcessor 클래스에 추가
 
     def get_all_users(self):
         """
