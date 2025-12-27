@@ -236,7 +236,7 @@
 			<button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
 				<% 
 					# 이모티콘 매핑 사전
-					flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳','pt': '🇵🇹','es': '🇪🇸'}
+					flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
 					
 					# 뒤에서부터 첫 번째 '-'를 기준으로 한 번만 분리
 					# 예: 'foru-ai-en' -> ['foru-ai', 'en']
@@ -294,42 +294,63 @@
 </nav>
 
 <div class="container mt-4">
-
-
-    <div class="user-profile">
-        % if user_info.get('profileImageUrl'):
-            <img src="{{ user_info['profileImageUrl'] }}" alt="{{ user_info.get('displayName', username) }}">
-        % end
-        <div><a href="https://x.com/{{username}}" class="user-link" target="_blank" >
-            <h1>{{ user_info.get('displayName', username) }}</h1>
-            <p class="text-muted">@{{ username }}</p>
-        </a></div>
+    <!-- 사용자 프로필 카드 -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    % if user_info.get('profileImageUrl'):
+                        <img src="{{ user_info['profileImageUrl'] }}" alt="{{ user_info.get('displayName', username) }}" style="width: 80px; height: 80px; border-radius: 50%;">
+                    % end
+                </div>
+                <div class="col" style="right:auto;">
+                    <h2 class="mb-1">
+                        <a href="https://x.com/{{username}}" class="user-link" target="_blank">{{ user_info.get('displayName', username) }}</a>
+                    </h2>
+                    <p class="text-muted mb-2">
+                        <a href="https://x.com/{{username}}" class="user-link" target="_blank">@{{ username }}</a>
+                    </p>
+                    <div class="d-flex gap-4">
+                        <div>
+                            <small class="text-muted d-block">{{t['followers']}}</small>
+                            <strong>{{ "{:,}".format(user_info.get('followers', 0)) }}</strong>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">{{t['smart_followers']}}</small>
+                            <strong>{{ "{:,}".format(user_info.get('smartFollowers', 0)) }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="user-stats mb-2">
-        <div class="stat-card card">
-            <div class="card-body">
-                <h5 class="card-title">{{ t['rank'] if metric == 'snapsPercent' else t['crank'] }} ({{ timeframe }})</h5>
-                <h2 class="card-text">{{ user_info.get(rank_col, '-') }}</h2>
-            </div>
-        </div>
-        <div class="stat-card card">
-            <div class="card-body">
-				<h5 class="card-title">{{ t['mindshare'] if metric == 'snapsPercent' else t['cmindshare']  }} ({{ timeframe }})</h5>
-                    <h2 class="card-text">{{ "{:.2f}%".format(user_info.get(mindshare_col, 0.0)) }}</h2>
-            </div>
-        </div>
-        <div class="stat-card card">
-            <div class="card-body">
-                <h5 class="card-title">{{t['followers']}}</h5>
-                <h2 class="card-text">{{ "{:,}".format(user_info.get('followers', 0)) }}</h2>
-            </div>
-        </div>
-        <div class="stat-card card">
-            <div class="card-body">
-                <h5 class="card-title">{{t['smart_followers']}}</h5>
-                <h2 class="card-text">{{ "{:,}".format(user_info.get('smartFollowers', 0)) }}</h2>
-            </div>
+    <!-- 타임프레임별 통계 -->
+    <div class="mb-4">
+        <h4 class="mb-3">{{ t['rank'] if metric == 'snapsPercent' else t['crank'] }} & {{ t['mindshare'] if metric == 'snapsPercent' else t['cmindshare'] }}</h4>
+        <div class="row g-3">
+            % for tf in timeframes:
+                <%
+                    tf_info = user_info_by_timeframe.get(tf, {})
+                    tf_rank = tf_info.get(rank_col, '-')
+                    tf_mindshare = tf_info.get(mindshare_col, 0.0)
+                %>
+                <div class="col-6 col-md-3">
+                    <div class="card h-100 text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted fw-bold">{{ tf }}</h6>
+                            <div class="mb-2">
+                                <small class="text-muted d-block">{{ t['rank'] if metric == 'snapsPercent' else t['crank'] }}</small>
+                                <h3 class="mb-0 text-primary">{{ tf_rank if tf_rank != '-' else '-' }}</h3>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">{{ t['mindshare'] if metric == 'snapsPercent' else t['cmindshare'] }}</small>
+                                <h4 class="mb-0 text-success">{{ "{:.2f}%".format(tf_mindshare) if tf_mindshare else '-' }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            % end
         </div>
     </div>
     <div class="chart-container" style="margin-top: 0;">
@@ -371,14 +392,7 @@
     <!-- 사용자 검색 JavaScript -->
     <script>
         // 사용자 데이터 (서버에서 전달받음)
-        const allUsers = [
-            % for user in all_users:
-                {
-                    username: "{{ user['username'] }}",
-                    displayName: "{{ user['displayName'] }}"
-                },
-            % end
-        ];
+        const allUsers = {{ !all_users }};
         
         const searchInput = document.getElementById('userSearchInput');
         const searchResults = document.getElementById('searchResults');
