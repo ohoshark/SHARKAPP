@@ -1,0 +1,210 @@
+		#creatorModal .modal-content {
+			background-image: url('/static/modal_background.jpg'); /* 배경 이미지 경로 */
+			background-size: cover;      /* 이미지가 요소를 가득 채우도록 */
+			background-position: center; /* 이미지를 중앙에 배치 */
+			background-repeat: no-repeat;
+			position: relative;
+			overflow: hidden; /* 테두리 곡선(border-radius) 밖으로 이미지가 나가지 않게 */
+		}
+		#creatorModal .modal-content::before {
+			content: "";
+			position: absolute;
+			top: 0; left: 0; right: 0; bottom: 0;
+			background: rgba(255, 255, 255, 0.0); /* 흰색 투명도 60% (필요에 따라 조절) */
+			z-index: 0;
+		}
+		/* 모달 내부 콘텐츠가 배경 위로 올라오도록 설정 */
+		#creatorModal .modal-body {
+			position: relative;
+			z-index: 1;
+		}
+		body {
+			background-color: #f8f9fa;
+			/* 이모지 전용 폰트들을 일반 폰트(Pretendard)보다 무조건 앞에 배치합니다. */
+			font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", 'Pretendard', sans-serif !important;
+		}
+        
+        /* 네비게이션 스타일 */
+        .navbar { border-bottom: 1px solid rgba(0,0,0,0.1); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .project-switcher { border: none; font-weight: 800; font-size: 1.1rem; cursor: pointer; background: transparent; padding: 0; }
+        .project-switcher:focus { shadow: none; outline: none; box-shadow: none; }
+
+        .creator-badge {
+            display: flex; align-items: center; background: #fff; border: 1px solid #ddd;
+            padding: 4px 12px 4px 6px; border-radius: 25px; cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .creator-badge:hover { background: #f0f0f0; border-color: #00d2ff; transform: translateY(-1px); }
+        .creator-badge img { width: 28px; height: 28px; border-radius: 50%; margin-right: 8px; }
+        .creator-badge span { font-size: 0.85rem; font-weight: 600; color: #333; }
+
+        /* 필터 및 테이블 카드 */
+        .filter-card { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .table-container { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        
+        /* 지갑 복사 박스 */
+        .donation-card {
+            background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 12px;
+            padding: 12px; cursor: pointer; position: relative;
+        }
+        .donation-card:hover { background: #eefbff; border-color: #00d2ff; }
+	@media (max-width: 767.98px) {
+		.container.mt-4 {
+			padding-bottom: 100px !important; /* FAB 버튼 높이(60px)보다 넉넉하게 줌 */
+		}
+	}
+	.noUi-handle.red-indicator {
+		border-color: #FF0000; 
+		box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.4); 
+	}
+	.fab-custom-size {
+		width: 50px; 
+		height: 50px;
+		padding: 0 !important; 
+		display: flex; 
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+	}
+	.fab-custom-size i {
+		font-size: 1.5rem; 
+		color: white; 
+	}
+	.btn-info.rounded-circle i {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		font-size: 1.5rem; 
+		color: white; 
+	}
+	.btn-info.rounded-circle { 
+		background-color: gray !important; 
+		border-color: gray !important;     
+}
+	
+    
+    
+    .dropdown-menu-end {
+        
+        left: auto !important;
+        right: 0;
+    }
+    
+    
+    .fixed-bottom {
+        padding-right: 20px !important;
+    }
+	@media (max-width: 767.98px) {
+		
+		.table-responsive .table,
+		.table-responsive thead,
+		.table-responsive tbody,
+		.table-responsive th,
+		.table-responsive td,
+		.table-responsive tr {
+			display: block;
+		}
+
+		
+		.table-responsive thead tr {
+			position: absolute;
+			top: -9999px;
+			left: -9999px;
+		}
+
+		
+		.table-responsive tbody tr {
+			border: 1px solid #ccc;
+			margin-bottom: 15px;
+			padding: 10px;
+		}
+
+		
+		.table-responsive td {
+			border: none;
+			border-bottom: 1px solid #eee;
+			position: relative;
+			padding-left: 50% !important; 
+			text-align: right;
+		}
+
+		
+		.table-responsive td:before {
+			
+			position: absolute;
+			left: 6px;
+			width: 45%;
+			padding-right: 10px;
+			white-space: nowrap;
+			text-align: left;
+			font-weight: bold;
+		}
+		
+		
+		.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
+		.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
+		.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
+		.table-responsive td:nth-of-type(4):before { content: "{{t['rank_change']}}"; }
+		.table-responsive td:nth-of-type(5):before { content: "{{t['pre']}} {{_col_metric}}{{t['ms']}}"; }
+		.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{_col_metric}}{{t['ms']}}"; } 
+		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}{{t['ms']}} {{t['change']}}"; } 
+		
+		
+		.table-responsive td:nth-of-type(1) {
+        
+        text-align: left; 
+        
+        padding-left: 5px !important; 
+		}
+		
+		
+		
+		.table-responsive td:nth-of-type(1):before { 
+			display: none; 
+		}
+		
+	}
+		.d-flex.justify-content-end.mt-5 {
+				
+				position: relative; 
+				
+				z-index: 100; 
+			}
+        .timestamp-selector {
+            margin-bottom: 20px;
+        }
+        .comparison-table {
+            margin-top: 30px;
+        }
+        .text-success {
+            color: #28a745 !important;
+            font-weight: bold;
+        }
+        .text-danger {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+		.user-link {
+			
+			text-decoration: none; 
+			
+			color: inherit; 
+			
+			 
+		}
+		.timestamp-selector {
+            margin-bottom: 20px;
+        }
+		
+		.user-link:hover {
+			text-decoration: none;
+			color: inherit; 
+		}
+		img.emoji {
+			height: 1em;
+			width: 1em;
+			margin: 0 .05em 0 .1em;
+			vertical-align: -0.1em;
+            }

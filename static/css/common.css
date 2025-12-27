@@ -1,0 +1,158 @@
+/* Modal 스타일 */
+#creatorModal .modal-content {
+    background-image: url('/static/modal_background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+    overflow: hidden;
+}
+
+#creatorModal .modal-content::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.0);
+    z-index: 0;
+}
+
+#creatorModal .modal-body {
+    position: relative;
+    z-index: 1;
+}
+
+/* Body 스타일 */
+body {
+    background-color: #f8f9fa;
+    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols", 'Pretendard', sans-serif !important;
+}
+
+/* 네비게이션 스타일 */
+.navbar {
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.project-switcher {
+    border: none;
+    font-weight: 800;
+    font-size: 1.1rem;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
+}
+
+.project-switcher:focus {
+    shadow: none;
+    outline: none;
+    box-shadow: none;
+}
+
+.creator-badge {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 4px 12px 4px 6px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.creator-badge:hover {
+    background: #f0f0f0;
+    border-color: #00d2ff;
+    transform: translateY(-1px);
+}
+
+.creator-badge img {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.creator-badge span {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #333;
+}
+
+/* 필터 및 테이블 카드 */
+.filter-card {
+    border-radius: 15px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.table-container {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* 지갑 복사 박스 */
+.donation-card {
+    background: #f8f9fa;
+    border: 1px dashed #ced4da;
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    position: relative;
+}
+
+.donation-card:hover {
+    background: #eefbff;
+    border-color: #00d2ff;
+}
+
+/* 이모지 스타일 */
+img.emoji {
+    height: 1em;
+    width: 1em;
+    margin: 0 .05em 0 .1em;
+    vertical-align: -0.1em;
+}
+
+/* 차트 컨테이너 */
+.chart-container {
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
+
+/* 차트 로딩 오버레이 */
+.card-body.chart-relative {
+    position: relative;
+    min-height: 400px;
+}
+
+.chart-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* 사용자 링크 */
+.user-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.user-link:hover {
+    text-decoration: none;
+    color: inherit;
+}

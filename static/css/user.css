@@ -1,0 +1,89 @@
+/* user.html 전용 스타일 */
+
+.modebar-btn {
+    width: 30px !important;
+    height: 30px !important;
+    padding: 4px !important;
+}
+
+.modebar-btn svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.user-profile img {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin-right: 20px;
+}
+
+.user-stats {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    flex: 1;
+    min-width: 150px;
+    margin: 10px;
+    text-align: center;
+}
+
+.search-dropdown {
+    position: absolute;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: none;
+}
+
+.search-result-item {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.search-result-item:hover {
+    background-color: #f5f5f5;
+}
+
+.search-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.chart-container .card-body {
+    padding: 0.5rem;
+}
+
+#chartCardBody > div {
+    width: 100% !important;
+    min-height: 400px;
+}
+
+.container.mt-4 {
+    padding-bottom: 120px !important;
+}
+
+@media (max-width: 767px) {
+    .stat-card {
+        flex: 1 1 45%;
+        margin: 5px;
+    }
+    
+    .user-stats {
+        justify-content: space-around;
+    }
+}
