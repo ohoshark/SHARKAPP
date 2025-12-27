@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사용자 비교 - 스냅퍼 분석</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chart-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">부이 스내퍼 분석</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">사용자 분석</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/compare">사용자 비교</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/leaderboard">리더보드 분석</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">사용자 비교</h1>
+        
+        <!-- 사용자 선택 폼 -->
+        <div class="mb-4">
+            <form method="get" action="/compare">
+                <div class="row g-3">
+                    <div class="col-md-4">
+						<label for="userSearch" class="form-label">사용자 검색:</label>
+						<input type="text" class="form-control" id="userSearch" placeholder="사용자 이름 또는 표시명 검색">
+						<div class="mt-2" style="max-height: 200px; overflow-y: auto;">
+							<select multiple class="form-select" id="userList" style="height: 200px;">
+								% for user in all_users:
+									<option value="{{ user['username'] }}">{{ user['displayName'] }} (@{{ user['username'] }})</option>
+								% end
+							</select>
+						</div>
+						<button type="button" class="btn btn-secondary mt-2" id="addUserBtn">추가</button>
+					</div>
+
+                    
+                    <div class="col-md-4">
+                        <label for="selectedUsers" class="form-label">선택된 사용자:</label>
+                        <select multiple class="form-select" id="selectedUsers" name="users" style="height: 200px;">
+                            % for username in selected_users:
+                                <option value="{{ username }}" selected>{{ username }}</option>
+                            % end
+                        </select>
+                        <button type="button" class="btn btn-danger mt-2" id="removeUserBtn">제거</button>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="timeframe" class="form-label">기간:</label>
+                            <select class="form-select" id="timeframe" name="timeframe">
+                                % for tf in timeframes:
+                                    <option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+                                % end
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="metric" class="form-label">지표:</label>
+                            <select class="form-select" id="metric" name="metric">
+                                % for key, name in metrics.items():
+                                    <option value="{{ key }}" {{ 'selected' if key == metric else '' }}>{{ name }}</option>
+                                % end
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">비교하기</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 비교 차트 -->
+        <div class="chart-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3>사용자 비교 ({{ timeframe }})</h3>
+                </div>
+                <div class="card-body">
+                    {{ !comparison_chart }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 사용자 검색 기능
+        document.getElementById('userSearch').addEventListener('input', function() {
+            const searchVal = this.value.toLowerCase();
+            const userList = document.getElementById('userList');
+            
+            for (let i = 0; i < userList.options.length; i++) {
+                const userName = userList.options[i].text.toLowerCase();
+                if (userName.indexOf(searchVal) > -1) {
+                    userList.options[i].style.display = "";
+                } else {
+                    userList.options[i].style.display = "none";
+                }
+            }
+        });
+        
+        // 사용자 추가
+        document.getElementById('addUserBtn').addEventListener('click', function() {
+            const userList = document.getElementById('userList');
+            const selectedUsers = document.getElementById('selectedUsers');
+            
+            for (let i = 0; i < userList.options.length; i++) {
+                if (userList.options[i].selected) {
+                    const username = userList.options[i].value;
+                    let alreadySelected = false;
+                    
+                    // 이미 선택된 사용자인지 확인
+                    for (let j = 0; j < selectedUsers.options.length; j++) {
+                        if (selectedUsers.options[j].value === username) {
+                            alreadySelected = true;
+                            break;
+                        }
+                    }
+                    
+                    // 새 사용자면 추가
+                    if (!alreadySelected) {
+                        const option = document.createElement('option');
+                        option.value = username;
+                        option.text = username;
+                        option.selected = true;
+                        selectedUsers.add(option);
+                    }
+                }
+            }
+        });
+        
+        // 사용자 제거
+        document.getElementById('removeUserBtn').addEventListener('click', function() {
+            const selectedUsers = document.getElementById('selectedUsers');
+            
+            for (let i = selectedUsers.options.length - 1; i >= 0; i--) {
+                if (selectedUsers.options[i].selected) {
+                    selectedUsers.remove(i);
+                }
+            }
+        });
+        
+        // 폼 제출 전 모든 선택된 사용자가 selected 상태가 되도록
+        document.querySelector('form').addEventListener('submit', function() {
+            const selectedUsers = document.getElementById('selectedUsers');
+            for (let i = 0; i < selectedUsers.options.length; i++) {
+                selectedUsers.options[i].selected = true;
+            }
+        });
+    </script>
+</body>
+</html>

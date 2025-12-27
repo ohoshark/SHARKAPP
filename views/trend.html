@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>트렌드 분석 - 스냅퍼 분석</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chart-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">쿠키 스냅퍼 분석</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">대시보드</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/compare">사용자 비교</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/leaderboard">리더보드 분석</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">트렌드 분석</h1>
+        
+        <!-- 기간 및 지표 선택 -->
+        <div class="mb-4">
+            <form method="get" action="/trends">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label for="timeframe" class="col-form-label">기간:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select" id="timeframe" name="timeframe">
+                            % for tf in timeframes:
+                                <option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+                            % end
+                        </select>
+                    </div>
+                    
+                    <div class="col-auto">
+                        <label for="metric" class="col-form-label">지표:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select" id="metric" name="metric">
+                            % for key, name in metrics.items():
+                                <option value="{{ key }}" {{ 'selected' if key == metric else '' }}>{{ name }}</option>
+                            % end
+                        </select>
+                    </div>
+                    
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">적용</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 트렌드 차트 -->
+        <div class="chart-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3>{{ metrics.get(metric, metric) }} 추이 ({{ timeframe }})</h3>
+                </div>
+                <div class="card-body">
+                    {{ !trend_chart }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 사용자 비교 차트 -->
+        <div class="chart-container">
+            <div class="card">
+                <div class="card-header">
+                    <h3>상위 사용자 비교 ({{ timeframe }})</h3>
+                </div>
+                <div class="card-body">
+                    {{ !comparison_chart }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ user_info.get('displayName', username) }} - 스내퍼 분석</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chart-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .user-profile img {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            margin-right: 20px;
+        }
+        .user-stats {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 150px;
+            margin: 10px;
+            text-align: center;
+        }
+        /* 검색 드롭다운 스타일 */
+        .search-dropdown {
+            position: absolute;
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .search-result-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .search-result-item:hover {
+            background-color: #f5f5f5;
+        }
+        .search-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+		.user-link {
+			/* 밑줄 제거 */
+			text-decoration: none; 
+			/* 링크 기본 색상(파란색) 초기화 (검은색으로 설정) */
+			color: inherit; 
+			/* hover 시 색상 변화 방지 (선택 사항) */
+			/* color: inherit; */ 
+		}
+
+		/* hover 시 밑줄 생기는 것 방지 (선택 사항) */
+		.user-link:hover {
+			text-decoration: none;
+			color: inherit; /* hover 시 텍스트 색상 변경 방지 */
+		}
+	/* ⭐ [추가] 차트 컨테이너 로딩 오버레이 스타일 ⭐ */
+		.card-body.chart-relative {
+			position: relative; /* 오버레이의 기준 위치 설정 */
+			min-height: 400px; /* 로딩 중 컨테이너가 찌그러지는 것을 방지하기 위해 최소 높이 지정 */
+		}
+		.chart-loading-overlay {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(255, 255, 255, 0.9); /* 흰색 반투명 배경 */
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 10; /* 차트 콘텐츠 위에 표시 */
+			font-size: 1.5rem;
+			font-weight: bold;
+			color: #007bff;
+		}
+</style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">부이 스내퍼 분석</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">대시보드</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/compare">사용자 비교</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/leaderboard">리더보드 분석</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- 기간 선택 -->
+        <div class="mb-4">
+            <form method="get" action="/user/{{ username }}">
+                <div class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label for="timeframe" class="col-form-label">기준 선택:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
+                            % for tf in timeframes:
+                                <option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+                            % end
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- 사용자 프로필 및 정보 -->
+        
+		<div class="user-profile">
+            % if user_info.get('profileImageUrl'):
+                <img src="{{ user_info['profileImageUrl'] }}" alt="{{ user_info.get('displayName', username) }}">
+            % end
+            <div><a href="https://x.com/{{username}}" class="user-link">
+                <h1>{{ user_info.get('displayName', username) }}</h1>
+                <p class="text-muted">@{{ username }}</p>
+            </a></div>
+        </div>
+
+        <!-- 사용자 통계 -->
+        <div class="user-stats">
+            <div class="stat-card card">
+                <div class="card-body">
+                    <h5 class="card-title">순위</h5>
+                    <h2 class="card-text">{{ user_info.get('rank', 'N/A') }}</h2>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <h5 class="card-title">마인드쉐어</h5>
+                    <h2 class="card-text">{{ "{:.2f}".format(user_info.get('snapsPercent', 0)) }}</h2>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <h5 class="card-title">팔로워</h5>
+                    <h2 class="card-text">{{ "{:,}".format(user_info.get('followers', 0)) }}</h2>
+                </div>
+            </div>
+            <div class="stat-card card">
+                <div class="card-body">
+                    <h5 class="card-title">주요 팔로워</h5>
+                    <h2 class="card-text">{{ "{:,}".format(user_info.get('smartFollowers', 0)) }}</h2>
+                </div>
+            </div>
+        </div>
+
+		<!-- 사용자 차트 -->
+		<div class="chart-container">
+			<div class="card">
+				<div class="card-header">
+					<h3>기준별 마인드쉐어 및 순위 변화 분석</h3>
+				</div>
+				<div class="card-body chart-relative" id="chartCardBody">
+                    <div id="chart-loading-overlay" class="chart-loading-overlay">
+                        차트 데이터 로딩 중...
+                    </div>
+					{{ !user_chart }}
+				</div>
+			</div>
+		</div>
+
+        <!-- 사용자 검색창 추가 -->
+        <div class="row mb-4">
+            <div class="col-md-8 search-container">
+                <input type="text" class="form-control" id="userSearchInput" placeholder="다른 사용자 검색 (이름 또는 ID)">
+                <div class="search-dropdown" id="searchResults"></div>
+            </div>
+            <div class="col-md-4">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 사용자 검색 JavaScript -->
+    <script>
+        // 사용자 데이터 (서버에서 전달받음)
+        const allUsers = [
+            % for user in all_users:
+                {
+                    username: "{{ user['username'] }}",
+                    displayName: "{{ user['displayName'] }}"
+                },
+            % end
+        ];
+        
+        const searchInput = document.getElementById('userSearchInput');
+        const searchResults = document.getElementById('searchResults');
+        
+        // 검색창 입력 이벤트
+        searchInput.addEventListener('input', function() {
+            const searchVal = this.value.toLowerCase();
+            
+            if (searchVal.length < 2) {
+                searchResults.style.display = 'none';
+                return;
+            }
+            
+            // 결과 필터링
+            const filteredUsers = allUsers.filter(user => {
+                return user.username.toLowerCase().includes(searchVal) || 
+                       user.displayName.toLowerCase().includes(searchVal);
+            }).slice(0, 10); // 최대 10개 결과만 표시
+            
+            // 결과 표시
+            if (filteredUsers.length > 0) {
+                searchResults.innerHTML = '';
+                filteredUsers.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `<strong>${user.displayName}</strong> <span class="text-muted">@${user.username}</span>`;
+                    item.addEventListener('click', function() {
+                        window.location.href = `/user/${user.username}?timeframe={{ timeframe }}`;
+                    });
+                    searchResults.appendChild(item);
+                });
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.style.display = 'none';
+            }
+        });
+        
+        // 검색창 외부 클릭 시 결과 숨기기
+        document.addEventListener('click', function(e) {
+            if (e.target !== searchInput && e.target.parentNode !== searchResults) {
+                searchResults.style.display = 'none';
+            }
+        });
+        
+        // 검색창 포커스 시 결과 다시 표시
+        searchInput.addEventListener('focus', function() {
+            if (this.value.length >= 2) {
+                searchResults.style.display = 'block';
+            }
+        });
+		// ⭐ [추가] 차트 로딩 오버레이 숨기기 ⭐
+        const chartLoadingOverlay = document.getElementById('chart-loading-overlay');
+        if (chartLoadingOverlay) {
+            // window.onload는 모든 자원(이미지, CSS, JS/차트 렌더링)이 로드된 후 발생합니다.
+            window.addEventListener('load', function() {
+                chartLoadingOverlay.style.display = 'none';
+            });
+        }
+    </script>
+</body>
+</html>

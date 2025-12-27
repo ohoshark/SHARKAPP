@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>리더보드 분석 - 스내퍼 분석</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+
+    <style>
+		.d-flex.justify-content-end.mt-5 {
+				/* z-index가 작동하려면 position 속성이 필요합니다. */
+				position: relative; 
+				/* 슬라이더 핸들(noUi-handle)의 기본 z-index보다 높은 값을 설정합니다. */
+				z-index: 100; 
+			}
+        .timestamp-selector {
+            margin-bottom: 20px;
+        }
+        .comparison-table {
+            margin-top: 30px;
+        }
+        .text-success {
+            color: #28a745 !important;
+            font-weight: bold;
+        }
+        .text-danger {
+            color: #dc3545 !important;
+            font-weight: bold;
+        }
+		.user-link {
+			/* 밑줄 제거 */
+			text-decoration: none; 
+			/* 링크 기본 색상(파란색) 초기화 (검은색으로 설정) */
+			color: inherit; 
+			/* hover 시 색상 변화 방지 (선택 사항) */
+			/* color: inherit; */ 
+		}
+		.timestamp-selector {
+            margin-bottom: 20px;
+        }
+		/* hover 시 밑줄 생기는 것 방지 (선택 사항) */
+		.user-link:hover {
+			text-decoration: none;
+			color: inherit; /* hover 시 텍스트 색상 변경 방지 */
+		}
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">부이 스내퍼 분석</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">사용자 분석</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/compare">사용자 비교</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/leaderboard">리더보드 분석</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">리더보드 변화 분석</h1>
+        
+        <!-- 기간 및 타임스탬프 선택 -->
+        <div class="card timestamp-selector">
+            <div class="card-header">
+                <h3>비교할 시간대 선택</h3>
+            </div>
+			<div class="card-body">
+				<form method="get" action="/leaderboard" id="comparisonForm">
+					<div class="row mb-3">
+						<div class="col-md-4">
+							<label for="timeframe" class="form-label">데이터 기준:</label>
+							<select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
+								% for tf in timeframes:
+									<option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
+								% end
+							</select>
+						</div>
+					</div>
+
+					<div class="row mb-4">
+						<div class="col-12">
+							<div class="d-flex justify-content-between mb-3">
+								<div class="text-start">
+									<strong>이전 시점:</strong> 
+									<span id="slider-timestamp1" class="text-muted"></span>
+								</div>
+								<div class="text-end">
+									<strong>현재 시점:</strong> 
+									<span id="slider-timestamp2" class="text-muted"></span>
+								</div>
+							</div>
+							
+							<div id="timeSlider" style="margin: 0 10px;"></div>
+							
+							<input type="hidden" id="timestamp1" name="timestamp1" value="{{ timestamp1 }}">
+							<input type="hidden" id="timestamp2" name="timestamp2" value="{{ timestamp2 }}">
+						</div>
+					</div>
+					
+					</form>
+				
+				<div class="d-flex justify-content-end mt-5">
+					<button type="submit" class="btn btn-primary" form="comparisonForm">비교하기</button>
+				</div>
+			</div>
+		</div>
+        
+        <!-- 비교 결과 테이블 -->
+        <div class="card comparison-table">
+            <div class="card-header">
+                <h3>
+                    분석 결과 
+                    <small class="text-muted">
+                        ({{ formatted_timestamps.get(timestamp1, timestamp1) }} → {{ formatted_timestamps.get(timestamp2, timestamp2) }})
+                    </small>
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    {{ !table_html }}
+                </div>
+                
+                <div class="mt-3">
+                    <small class="d-block mb-2">
+                        <span class="text-success">↑</span> 순위가 상승했음을 의미합니다 (낮은 숫자가 더 좋은 순위)
+                    </small>
+                    <small class="d-block">
+                        <span class="text-success">↑</span> 마인드쉐어 지수가 증가했음을 의미합니다
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+		// leaderboard.html (스크립트 부분)
+
+		// -------------------------------------------------------------------------
+		// ⭐ [추가] 미니 타임라인 (noUiSlider) 로직 ⭐
+		// -------------------------------------------------------------------------
+
+		// 서버에서 전달받은 원본 타임스탬프 리스트를 JavaScript에서 사용 가능한 형태로 변환
+		const rawTimestamps = [
+			% for ts in timestamps:
+				"{{ ts }}",
+			% end
+		];
+
+		// 서버에서 전달받은 포맷팅된 타임스탬프 리스트를 JavaScript에서 사용 가능한 형태로 변환
+		const formattedTimestamps = {
+			% for ts_key, ts_value in formatted_timestamps.items():
+				"{{ ts_key }}": "{{ ts_value }}",
+			% end
+		};
+
+		// 현재 선택된 timestamp1, timestamp2
+		const currentTs1 = "{{ timestamp1 }}";
+		const currentTs2 = "{{ timestamp2 }}";
+
+		// 타임스탬프 문자열을 인덱스로 변환하는 맵 (슬라이더는 숫자 인덱스를 사용)
+		const timestampMap = {};
+		rawTimestamps.forEach((ts, index) => {
+			timestampMap[ts] = index;
+		});
+
+
+		document.addEventListener('DOMContentLoaded', function() {
+			const slider = document.getElementById('timeSlider');
+			const input1 = document.getElementById('timestamp1');
+			const input2 = document.getElementById('timestamp2');
+			const display1 = document.getElementById('slider-timestamp1');
+			const display2 = document.getElementById('slider-timestamp2');
+
+			// 타임스탬프가 2개 이상일 때만 슬라이더 초기화
+			if (rawTimestamps.length >= 2) {
+				
+				// ⭐ [핵심 수정] URL 값의 인덱스를 명시적으로 찾습니다.
+				let start1_index = timestampMap[currentTs1];
+				let start2_index = timestampMap[currentTs2];
+
+				// 인덱스 0(첫 번째 값)이 넘어왔을 때 || 연산자가 잘못 작동하는 것을 방지합니다.
+				// URL 타임스탬프가 유효하지 않으면 기본값(뒤에서 두 번째/마지막)을 사용합니다.
+				const start1 = (start1_index === undefined) ? rawTimestamps.length - 2 : start1_index;
+				const start2 = (start2_index === undefined) ? rawTimestamps.length - 1 : start2_index;
+
+				noUiSlider.create(slider, {
+					start: [start1, start2], // [timestamp1 인덱스, timestamp2 인덱스]
+					connect: true,
+					step: 1, // 1단계씩 이동 (타임스탬프 1개 단위)
+					range: {
+						'min': 0,
+						'max': rawTimestamps.length - 1
+					},
+					pips: { // 주요 지점에 표시를 추가 (선택 사항)
+						mode: 'count',
+						values: 5,
+						density: 4
+					}
+				});
+
+				// 슬라이더 값이 변경될 때마다 실행되는 이벤트
+				slider.noUiSlider.on('update', function (values, handle) {
+					// values는 현재 핸들 위치의 인덱스 [index1, index2]
+					const index1 = Math.round(values[0]);
+					const index2 = Math.round(values[1]);
+					
+					// 인덱스를 실제 타임스탬프 문자열로 변환
+					const newTs1 = rawTimestamps[index1];
+					const newTs2 = rawTimestamps[index2];
+					
+					// 폼 제출에 사용될 숨겨진 입력 필드 업데이트
+					input1.value = newTs1;
+					input2.value = newTs2;
+					
+					// 화면에 표시되는 텍스트 업데이트
+					display1.textContent = formattedTimestamps[newTs1] || newTs1;
+					display2.textContent = formattedTimestamps[newTs2] || newTs2;
+				});
+
+			} else {
+				// 데이터가 부족한 경우 슬라이더 대신 메시지 표시
+				document.getElementById('timeSlider').innerHTML = '<p class="text-warning">비교 가능한 타임스탬프 데이터가 부족합니다.</p>';
+			}
+
+			// 폼 제출 전 검증 (슬라이더는 자동으로 서로 다른 값을 선택하도록 제한되지만, 폼 전송 전에 다시 확인)
+			document.getElementById('comparisonForm').addEventListener('submit', function(e) {
+				if (input1.value === input2.value) {
+					e.preventDefault();
+					alert('비교를 위해 서로 다른 시간대를 선택해주세요.');
+					return false;
+				}
+			});
+		});
+    </script>
+	<script>
+		$.fn.dataTable.ext.type.order['special-num-pre'] = function ( data ) {
+			// '↑', '↓', 콤마(,), 공백 등을 제거하고 숫자만 남깁니다.
+			let num = data.replace(/[↑↓,-]/g, ''); 
+			
+			// 만약 데이터가 '-' (변화 없음)라면 0으로 간주합니다.
+			if (num === '') {
+				return 0;
+			}
+			
+			return parseFloat(num);
+		};
+
+
+		$(document).ready(function() {
+			$('#leaderboardTable').DataTable({
+				"paging": false,  // 페이징 비활성화 (모든 결과 한 페이지에 표시)
+				"info": false,    // "n개 중 1-m 표시" 정보 숨기기
+				"ordering": true, // 정렬 기능 활성화
+				"searching": false, // 검색 기능 비활성화
+				"language": {
+					"emptyTable": "비교할 데이터가 없습니다.",
+					"zeroRecords": "일치하는 데이터가 없습니다."
+				},
+				"order": [[2, 'asc']], // 기본 정렬: 현재 순위 기준 내림차순
+				"columnDefs": [
+					{ "orderable": false, "targets": 0 }, // 번호(#) 열 정렬 비활성화
+					{ "orderable": true, "targets": "_all" } // 나머지 열 정렬 활성화
+				]
+			});
+			
+			// 테이블 스타일 조정
+			$('.dataTables_wrapper').addClass('no-footer');
+		});
+	</script>
+
+</body>
+</html>
