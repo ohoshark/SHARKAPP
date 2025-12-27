@@ -7,12 +7,108 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">	
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
 	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
     <style>
+	/* FAB 버튼 아이콘 중앙 정렬 */
+    .btn-primary.rounded-circle i {
+        /* 부트스트랩 5에서 Flexbox를 사용하여 내부 아이콘을 중앙에 배치 */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        font-size: 1.5rem; /* 아이콘 크기 조정 */
+        /* 아이콘 색상을 버튼 색상에 맞게 조정 (선택 사항) */
+        color: white; 
+    }
+	
+    
+    /* 드롭다운 메뉴 위치 조정 (버튼 위) */
+    .dropdown-menu-end {
+        /* 모바일 환경에서 드롭다운 메뉴가 화면을 넘어가지 않도록 */
+        left: auto !important;
+        right: 0;
+    }
+    
+    /* 스크롤바와 겹치지 않도록 버튼에 약간의 오른쪽 마진 부여 */
+    .fixed-bottom {
+        padding-right: 20px !important;
+    }
+	@media (max-width: 767.98px) {
+		/* 테이블을 블록 요소로 강제 변환 */
+		.table-responsive .table,
+		.table-responsive thead,
+		.table-responsive tbody,
+		.table-responsive th,
+		.table-responsive td,
+		.table-responsive tr {
+			display: block;
+		}
+
+		/* 헤더 숨기기 */
+		.table-responsive thead tr {
+			position: absolute;
+			top: -9999px;
+			left: -9999px;
+		}
+
+		/* 행(tr)을 구분하기 쉽도록 경계선 및 여백 추가 */
+		.table-responsive tbody tr {
+			border: 1px solid #ccc;
+			margin-bottom: 15px;
+			padding: 10px;
+		}
+
+		/* 셀(td)을 세로로 쌓기 */
+		.table-responsive td {
+			border: none;
+			border-bottom: 1px solid #eee;
+			position: relative;
+			padding-left: 50% !important; /* 레이블 공간 확보 */
+			text-align: right;
+		}
+
+		/* 레이블 생성 (첫 번째 열의 제목을 레이블로 사용) */
+		.table-responsive td:before {
+			/* 헤더의 제목을 content에 넣어 레이블로 표시 (주의: 이 부분은 서버 측 렌더링 또는 JavaScript로 처리하는 것이 더 정확합니다) */
+			position: absolute;
+			left: 6px;
+			width: 45%;
+			padding-right: 10px;
+			white-space: nowrap;
+			text-align: left;
+			font-weight: bold;
+		}
+		
+		/* 실제 레이블 매핑 (CSS만으로는 동적 헤더 매핑이 어려워 예시로 둡니다.) */
+		.table-responsive td:nth-of-type(1):before { content: "사용자"; }
+		.table-responsive td:nth-of-type(2):before { content: "이전 순위"; }
+		.table-responsive td:nth-of-type(3):before { content: "현재 순위"; }
+		.table-responsive td:nth-of-type(4):before { content: "순위 변화"; }
+		.table-responsive td:nth-of-type(5):before { content: "이전 마쉐"; }
+		.table-responsive td:nth-of-type(6):before { content: "현재 마쉐"; } 
+		.table-responsive td:nth-of-type(7):before { content: "마쉐 변화"; } 
+		/* ... 테이블 구조에 맞게 인덱스와 content를 조정하세요. */
+		
+		.table-responsive td:nth-of-type(1) {
+        /* 데이터 자체를 왼쪽 정렬 */
+        text-align: left; 
+        /* 레이블 공간 확보를 위한 왼쪽 패딩을 줄이거나 조정합니다. */
+        padding-left: 5px !important; 
+		}
+		
+		/* 사용자 이름 레이블 (td:nth-of-type(1):before)은 숨기거나 제거 */
+		/* 레이블이 필요 없다면 아래 코드를 추가하여 "사용자" 레이블을 숨깁니다. */
+		.table-responsive td:nth-of-type(1):before { 
+			display: none; 
+		}
+		
+	}
 		.d-flex.justify-content-end.mt-5 {
 				/* z-index가 작동하려면 position 속성이 필요합니다. */
 				position: relative; 
@@ -52,30 +148,47 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
-            <a class="navbar-brand" href="/">부이 스내퍼 분석</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">사용자 분석</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/compare">사용자 비교</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/leaderboard">리더보드 분석</a>
-                    </li>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+        
+        <div class="d-flex align-items-center">
+            
+        <a class="navbar-brand" href="/{{current_project}}/">쿠키 스내퍼 분석</a>
+        </div>
+		<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav"> <li class="nav-item">
+                <li class="nav-item">
+                    <a class="nav-link" href="/{{current_project}}/">사용자 분석</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/{{current_project}}/compare">사용자 비교</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/{{current_project}}/leaderboard">리더보드 분석</a>
+                </li>
+            </ul>
+        </div>
+		            <div class="dropdown me-3"> 
+                <button class="btn btn-dark dropdown-toggle" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    {{ current_project.upper() }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="projectDropdown">
+                    <!-- <li><h6 class="dropdown-header">기본 프로젝트</h6></li> -->
+                    <li><a class="dropdown-item" href="/vooi/{{current_page}}">VOOI</a></li>
+                    <li><a class="dropdown-item" href="/spaace/{{current_page}}">SPAACE</a></li>
+                    <li><a class="dropdown-item" href="/superform/{{current_page}}">SUPERFORM</a></li>
+                    <li><a class="dropdown-item" href="/rayls/{{current_page}}">RAYLS</a></li>
                 </ul>
             </div>
-        </div>
-    </nav>
+    </div>
+</nav>
 
     <div class="container mt-4">
-        <h1 class="mb-4">리더보드 변화 분석</h1>
+        <h1 class="mb-4">{{project.upper()}} 리더보드 변화 분석</h1>
         
         <!-- 기간 및 타임스탬프 선택 -->
         <div class="card timestamp-selector">
@@ -83,7 +196,7 @@
                 <h3>비교할 시간대 선택</h3>
             </div>
 			<div class="card-body">
-				<form method="get" action="/leaderboard" id="comparisonForm">
+				<form method="get" action="/{{project}}/leaderboard" id="comparisonForm">
 					<div class="row mb-3">
 						<div class="col-md-4">
 							<label for="timeframe" class="form-label">데이터 기준:</label>
@@ -139,12 +252,12 @@
                 </div>
                 
                 <div class="mt-3">
-                    <small class="d-block mb-2">
-                        <span class="text-success">↑</span> 순위가 상승했음을 의미합니다 (낮은 숫자가 더 좋은 순위)
-                    </small>
-                    <small class="d-block">
-                        <span class="text-success">↑</span> 마인드쉐어 지수가 증가했음을 의미합니다
-                    </small>
+                    <!-- <small class="d-block mb-2"> -->
+                        <!-- <span class="text-success">↑</span> 순위가 상승했음을 의미합니다 (낮은 숫자가 더 좋은 순위) -->
+                    <!-- </small> -->
+                    <!-- <small class="d-block"> -->
+                        <!-- <span class="text-success">↑</span> 마인드쉐어 지수가 증가했음을 의미합니다 -->
+                    <!-- </small> -->
                 </div>
             </div>
         </div>
@@ -265,27 +378,105 @@
 		};
 
 
+		// 기존 DataTables 및 정렬 스크립트를 이 하나의 블록으로 통합합니다.
 		$(document).ready(function() {
-			$('#leaderboardTable').DataTable({
-				"paging": false,  // 페이징 비활성화 (모든 결과 한 페이지에 표시)
-				"info": false,    // "n개 중 1-m 표시" 정보 숨기기
-				"ordering": true, // 정렬 기능 활성화
-				"searching": false, // 검색 기능 비활성화
+			
+			// 1. DataTables 인스턴스를 var 또는 let으로 선언하여 스코프 내에서 사용 가능하게 합니다.
+			const table = $('#leaderboardTable').DataTable({
+				"paging": false,
+				"info": false,
+				"ordering": true,
+				"searching": false,
 				"language": {
 					"emptyTable": "비교할 데이터가 없습니다.",
 					"zeroRecords": "일치하는 데이터가 없습니다."
 				},
-				"order": [[2, 'asc']], // 기본 정렬: 현재 순위 기준 내림차순
+				"order": [[2, 'asc']], // 기본 정렬: 현재 순위 (인덱스 2) 기준 오름차순
 				"columnDefs": [
-					{ "orderable": false, "targets": 0 }, // 번호(#) 열 정렬 비활성화
-					{ "orderable": true, "targets": "_all" } // 나머지 열 정렬 활성화
+					{ "orderable": false, "targets": 0 },
+					{ "orderable": true, "targets": "_all" }
 				]
 			});
 			
 			// 테이블 스타일 조정
 			$('.dataTables_wrapper').addClass('no-footer');
+
+
+			// 2. ⭐ 현재 정렬 상태를 추적할 전역 변수 설정 ⭐
+			let currentSortColumn = 3; // DataTables 초기 정렬 인덱스
+			let currentSortDirection = 'asc'; // DataTables 초기 정렬 방향
+
+            // 3. ⭐ 초기 FAB 아이콘 및 드롭다운 항목에 표시 적용 ⭐
+			const initialIndicator = (currentSortDirection === 'asc') ? ' ▲' : ' ▼';
+            // DataTables의 기본 정렬(현재 순위, data-column="3")에 표시 추가
+            const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
+            if (defaultSortOption.length) {
+                defaultSortOption.text(defaultSortOption.text() + initialIndicator);
+            }
+            // FAB 버튼 아이콘 초기 설정
+			$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-up-alt');
+
+
+			// 4. ⭐ FAB 드롭다운 항목 클릭 이벤트 처리 (토글 및 표시) ⭐
+			$('.sort-option').on('click', function(e) {
+				e.preventDefault();
+				
+				const requestedColumn = parseInt($(this).data('column'));
+				const defaultDirection = $(this).data('default-dir') || 'asc'; 
+				let newDirection;
+
+                // 1단계: 새 정렬 방향 결정 (토글 로직)
+				if (requestedColumn === currentSortColumn) {
+					newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
+				} else {
+					newDirection = defaultDirection;
+				}
+
+                // 2단계: 기존 표시 제거
+                $('.sort-option').each(function() {
+                    let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
+                    $(this).text(text);
+                });
+
+                // 3단계: DataTables 정렬 적용
+				table.order([requestedColumn, newDirection]).draw();
+
+                // 4단계: 상태 업데이트
+				currentSortColumn = requestedColumn;
+				currentSortDirection = newDirection;
+
+                // 5단계: 새로운 표시 추가
+                const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
+                const currentText = $(this).text();
+                $(this).text(currentText + indicator);
+
+                // 6단계: FAB 버튼의 아이콘 업데이트
+				const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
+				$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
+			});
 		});
 	</script>
 
-</body>
+<div class="fixed-bottom d-flex justify-content-end p-4">
+        <div class="dropdown dropup">
+            <button class="btn btn-primary btn-lg rounded-circle shadow-lg" 
+                    type="button" 
+                    id="fabSortDropdown" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false"
+                    style="width: 60px; height: 60px;">
+                <i class="fas fa-sort-amount-down-alt"></i> </button>
+
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
+                <li class="dropdown-header">정렬 기준 선택</li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">이전 순위</a></li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">현재 순위</a></li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">순위 변화</a></li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">이전 마쉐</a></li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">현재 마쉐</a></li>
+                <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">마쉐 변화</a></li>
+            </ul>
+        </div>
+    </div>
+    </body>
 </html>

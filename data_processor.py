@@ -25,6 +25,7 @@ class DataProcessor:
             files_to_load = defaultdict(list)
             for timeframe in self.timeframes:
                 path = os.path.join(self.data_dir, timeframe)
+                # print(path)
                 files_to_load[timeframe] = sorted(glob.glob(os.path.join(path, "*.json")))
                 
             # 초기 로딩 시 기존 데이터 프레임 초기화
