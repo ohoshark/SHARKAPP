@@ -1,11 +1,55 @@
 <!DOCTYPE html>
-<html lang="ko">
+<%
+    # i18n 사전 설정
+    i18n = {
+        'ko': {
+            'user_analysis': '사용자 분석',
+            'leaderboard_analysis': '리더보드 분석',
+            'metric_standard': '지표 기준',
+            'rank': '순위',
+            'crank': 'c순위',
+            'mindshare': '마인드쉐어',
+            'cmindshare': 'c마인드쉐어',
+            'followers': '팔로워',
+            'smart_followers': '스마트 팔로워',
+            'chart_title': 'Mindshare 변화 분석',
+			'alias_form': '별명 또는 핸들 입력',
+            'chart_loading': '차트 데이터 로딩 중...',
+            'search_placeholder': '사용자 검색 (이름 또는 ID)',
+            'close': '닫기',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+            'user_analysis': 'User Analysis',
+            'leaderboard_analysis': 'Leaderboard',
+            'metric_standard': 'Metric',
+            'rank': 'Rank',
+            'crank': 'cRank',
+            'mindshare': 'Mindshare',
+            'cmindshare': 'cMindshare',
+            'followers': 'Followers',
+            'smart_followers': 'Smart Followers',
+            'chart_title': 'Mindshare Analysis',
+			'alias_form': 'Enter a nickname or handle',
+            'chart_loading': 'Loading Chart Data...',
+            'search_placeholder': 'Search users (Name or ID)',
+            'close': 'Close',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{project.upper()}} 사용자 분석 - SHARKAPP</title>
+    <title>{{project.upper()}} t['user_analysis'] - SHARKAPP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
 		#creatorModal .modal-content {
 			background-image: url('/static/modal_background.jpg'); /* 배경 이미지 경로 */
@@ -81,7 +125,12 @@
 			font-weight: bold;
 			color: #007bff;
 		}
-</style>
+		img.emoji {
+			height: 1em;
+			width: 1em;
+			margin: 0 .05em 0 .1em;
+			vertical-align: -0.1em;
+    </style>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
@@ -90,17 +139,38 @@
             <img src="/static/cookie_shark.png" width="32" height="32" class="me-2">
         <span class="text-info me-1 fw-bold" style="padding: 5; font-size: 1.2rem; letter-spacing: 1px;">SHARKAPP</span>
 
-            <div class="dropdown">
-                <button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    {{project.upper()}}
-                </button>
-                <ul class="dropdown-menu shadow border-0" style="padding: 5;" aria-labelledby="projectDropdown">
-                    <li><a class="dropdown-item" href="/vooi/leaderboard">VOOI</a></li>
-                    <li><a class="dropdown-item" href="/spaace/leaderboard">SPAACE</a></li>
-                    <li><a class="dropdown-item" href="/superform/leaderboard">SUPERFORM</a></li>
-                    <li><a class="dropdown-item" href="/rayls/leaderboard">RAYLS</a></li>
-                </ul>
-            </div>
+		<div class="dropdown">
+			<button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+				<% 
+					# 이모티콘 매핑 사전
+					flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳','pt': '🇵🇹','es': '🇪🇸'}
+					
+					# 뒤에서부터 첫 번째 '-'를 기준으로 한 번만 분리
+					# 예: 'foru-ai-en' -> ['foru-ai', 'en']
+					current_parts = project.rsplit('-', 1)
+					current_name = current_parts[0].upper()
+					current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
+					current_flag = flags.get(current_lang, '')
+				%>
+				{{current_flag}} {{current_name}}
+			</button>
+			<ul class="dropdown-menu shadow border-0" style="padding: 5px;" aria-labelledby="projectDropdown">
+				% for p in all_projects:
+					<% 
+						# 각 프로젝트 목록도 동일하게 뒤에서부터 분리
+						p_parts = p.rsplit('-', 1)
+						p_name = p_parts[0].upper()
+						p_lang = p_parts[1].lower() if len(p_parts) > 1 else ''
+						p_flag = flags.get(p_lang, '')
+					%>
+					<li>
+						<a class="dropdown-item {{'active' if p == project else ''}}" href="/{{p}}/leaderboard">
+							{{p_flag}} {{p_name}}
+						</a>
+					</li>
+				% end
+			</ul>
+		</div>
         </div>
 
         
@@ -111,23 +181,25 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-lg-4 me-auto">
                 <li class="nav-item">
-                    <a class="nav-link active" href="/{{project}}/">사용자 분석</a>
+					<a class="nav-link {{'active' if current_page == 'user' else ''}}" href="/{{project}}/">{{t['user_analysis']}}</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/{{project}}/leaderboard">리더보드 분석</a>
+					<a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="/{{project}}/leaderboard">{{t['leaderboard_analysis']}}</a>
                 </li>
             </ul>
-            
-            <div class="creator-badge" data-bs-toggle="modal" data-bs-target="#creatorModal">
+					
+            <div class="creator-badge me-2" data-bs-toggle="modal" data-bs-target="#creatorModal">
                 <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
                 <span>Created by ohoshark</span>
             </div>
-        </div>
+			<div class="btn-group btn-group-sm me-3">
+					<a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
+					<a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
+			</div>
     </div>
 </nav>
 
     <div class="container mt-4 chart-relative" id="chartCardBody">
-        <!-- <h1 class="mb-4">{{project.upper()}} 사용자 분석</h1> -->
 <!-- 사용자 검색 -->
 <div class="chart-container" >
 		<div id="chart-loading-overlay" class="chart-loading-overlay">
@@ -135,11 +207,11 @@
 		</div>
     <div class="card">
         <div class="card-header">
-            <h3>{{project.upper()}} 사용자 분석</h3>
+            <h3>{{project.upper()}} {{t['user_analysis']}}</h3>
         </div>
 		<div class="card-body">
             <div class="mb-3">
-                <input type="text" class="form-control" id="userSearch" placeholder="별명 또는 핸들 입력">
+                <input type="text" class="form-control" id="userSearch" placeholder="{{t['alias_form']}}">
             </div>
             <div class="list-group" style="max-height: 300px; overflow-y: auto;">
                 % for user in all_users:
@@ -199,7 +271,7 @@
                 <div class="donation-card mb-2" onclick="copyWalletAddress()">
                     <div class="text-info fw-bold mb-1" style="font-size: 0.7rem;">ENS DONATION</div>
                     <div class="fw-bold text-dark">ohoshark.eth</div>
-                    <div class="text-muted mt-1" style="font-size: 0.65rem;">클릭하여 주소 복사 🦈</div>
+                    <div class="text-muted mt-1" style="font-size: 0.65rem;">{{t['click_to_copy']}}</div>
                 </div>
 				<div class="mb-0">
 					<a href="https://rul.kr/Xtracker" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill w-100 fw-bold shadow-sm custom-cookie-btn" style="background-color: #aaf0d1; font-size: 0.8rem; border-width: 1px; color: #000; padding: 8px 15px; line-height: 1.2;">
@@ -214,7 +286,7 @@
 					 role="alert" aria-live="assertive" aria-atomic="true" 
 					 style="border-radius: 12px; background-color: rgba(0, 0, 0, 0.7); min-height: auto;"> <div class="d-flex justify-content-center">
 						<div class="toast-body text-center p-2" style="font-size: 0.85rem; line-height: 1.2;">
-							지갑 주소가 복사되었습니다! 🦈
+							{{ t['copy_success'] }}
 						</div>
 					</div>
 				</div>
@@ -224,6 +296,7 @@
     </div>
 </div>
 <script>
+
 	function copyWalletAddress() {
 		const addr = "0xC8e695B30EF512AE634007efa89A75E1421e3055";
 		
@@ -241,8 +314,12 @@
 			console.error('복사 실패:', err);
 		});
 	}
-	</script>
 
+  $(document).ready(function() {
+    // 특정 요소(예: 바디 전체) 내의 이모티콘을 이미지로 변환
+    twemoji.parse(document.body);
+  });
+</script>
 
 </body>
 </html>

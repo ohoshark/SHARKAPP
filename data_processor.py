@@ -14,7 +14,6 @@ class DataProcessor:
         self.timeframes = ['7D', '14D', '30D', 'TOTAL']
         self.data = {}
         self.user_data = {}
-        self.trends = {}
         self.latest_file = {}
         # 캐시 파일 경로 설정
         self.cache_dir = os.path.join(data_dir, '_cache')
@@ -90,9 +89,8 @@ class DataProcessor:
                 # 3. 변경된 데이터를 캐시에 즉시 저장
                 self.save_cache(timeframe)
             
-        if new_data_loaded:
+        if new_data_loaded or any(not df.empty for df in self.data.values()):
             self.process_user_data()
-            self.process_trend_data()
             
         return self.data
 
@@ -105,7 +103,7 @@ class DataProcessor:
                     'df': self.data[timeframe],
                     'latest_file': self.latest_file.get(timeframe, '')
                 }, f)
-            # print(f"[{timeframe}] 캐시 저장 완료")
+            print(f"[{timeframe}] 캐시 저장 완료")
         except Exception as e:
             print(f"[{timeframe}] 캐시 저장 실패: {e}")
 
@@ -139,17 +137,6 @@ class DataProcessor:
                     user_df = df[df['username'] == username].sort_values('timestamp')
                     self.user_data[timeframe][username] = user_df
     
-    def process_trend_data(self):
-        """시간에 따른 트렌드 데이터를 처리합니다"""
-        for timeframe, df in self.data.items():
-            if not df.empty and 'timestamp' in df.columns:
-                # 타임스탬프별 통계
-                self.trends[timeframe] = df.groupby('timestamp').agg({
-                    'snapsPercent': 'mean',
-                    'followers': 'mean',
-                    'smartFollowers': 'mean',
-                    'rank': 'min'  # 최고 순위
-                }).reset_index()
                 
     def get_top_users(self, timeframe='TOTAL', n=10, metric='snapsPercent'):
         """특정 지표 기준으로 상위 사용자를 반환합니다"""
@@ -165,10 +152,12 @@ class DataProcessor:
         return pd.DataFrame()
 
     def get_user_history(self, username, timeframe='TOTAL'):
+        # print(self.user_data['7D'])
         if timeframe in self.user_data and username in self.user_data[timeframe]:
             history = self.user_data[timeframe][username].copy()
-            
+            # print(history)
             if history.empty:
+                # print("history empty")
                 return pd.DataFrame()
 
             # 1. timestamp를 datetime 객체로 변환 (정렬 및 샘플링을 위해 필수)
@@ -181,7 +170,7 @@ class DataProcessor:
                 # 인덱스를 활용해 균등하게 샘플링
                 indices = np.linspace(0, len(history) - 1, 500).astype(int)
                 history = history.iloc[indices]
-            
+            # print("history  정상")
             return history
         return pd.DataFrame()
 
@@ -270,12 +259,7 @@ class DataProcessor:
             analysis_data[tf] = self.get_user_history(username, tf)
         return analysis_data
 
-    def get_trend_data(self, timeframe='TOTAL', metric='snapsPercent'):
-        """시간에 따른 트렌드 데이터를 반환합니다"""
-        if timeframe in self.trends and metric in self.trends[timeframe].columns:
-            return self.trends[timeframe][['timestamp', metric]]
-        return pd.DataFrame()
-    
+
     def get_user_comparison(self, usernames, timeframe='TOTAL', metric='snapsPercent'):
         """여러 사용자를 비교하기 위한 데이터를 반환합니다"""
         result = {}

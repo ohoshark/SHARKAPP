@@ -21,7 +21,23 @@ project_instances = {}
 LOG_FILE = 'access_log.txt'
 
 # main.py 파일 내 log_access 함수를 아래와 같이 수정
+PROJECT_CACHE = {"list": [], "last_updated": 0}
+CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 
+def get_cached_projects():
+    current_time = time.time()
+    # 마지막 업데이트로부터 5분이 지나지 않았으면 저장된 리스트 반환
+    if PROJECT_CACHE["list"] and (current_time - PROJECT_CACHE["last_updated"] < CACHE_INTERVAL):
+        return PROJECT_CACHE["list"]
+    
+    # 5분이 지났거나 리스트가 없으면 새로 스캔
+    data_dir = 'data'
+    if os.path.exists(data_dir):
+        projects = sorted(project_instances.keys())
+        PROJECT_CACHE["list"] = projects
+        PROJECT_CACHE["last_updated"] = current_time
+        return projects
+    return []
 def log_access(route_name, project_name, username=None):
     """
     접속 정보를 로그 파일에 기록합니다.
@@ -61,19 +77,10 @@ def log_access(route_name, project_name, username=None):
         print(f"[ERROR] 로그 파일 쓰기 실패: {e}")
         
 def get_data_processor(project_name):
+    # 등록된 인스턴스가 있는지 확인 (없으면 에러)
     if project_name not in project_instances:
-        print(f"[초기화] {project_name} 프로젝트 데이터 로드 시작")
-        project_dir = os.path.join(base_data_dir, project_name)
-        if not os.path.exists(project_dir):
-            raise ValueError(f"Project {project_name} not found")
-        
-        # DataProcessor 생성 및 초기 데이터 로드
-        dp = DataProcessor(project_dir)
-        dp.load_data()  # 초기 데이터 강제 로드
-        
-        project_instances[project_name] = dp  # 수정: dp 인스턴스를 저장
-        start_data_loader_thread(project_name)
-        print(f"[초기화] {project_name} 데이터 로드 완료")
+        raise ValueError(f"Project '{project_name}' not found or not registered.")
+    
     return project_instances[project_name]
 
 
@@ -94,28 +101,50 @@ def start_data_loader_thread(project_name):
     print(f"[{project_name}] 데이터 로더 스레드 시작")
 
 def init_projects_on_startup():
-    """서버 시작 시 data 디렉토리 스캔하여 모든 프로젝트를 병렬로 초기화"""
-    project_names = [
-        name for name in os.listdir(base_data_dir) 
-        if os.path.isdir(os.path.join(base_data_dir, name))
-    ]
+    if not os.path.exists(base_data_dir):
+        os.makedirs(base_data_dir)
     
-    print(f"[시스템] 총 {len(project_names)}개 프로젝트 초기화 시작 (병렬 처리)")
+    project_instances.clear()
 
-    # CPU 코어 수에 맞춰 적절한 thread 개수 설정 (예: 4~8개)
-    with ThreadPoolExecutor(max_workers=12) as executor:
-        # get_data_processor 함수를 각 프로젝트명에 대해 병렬 실행
-        executor.map(get_data_processor, project_names)
-
-    print("[시스템] 모든 프로젝트 초기화 완료")
+    for project_name in os.listdir(base_data_dir):
+        project_path = os.path.join(base_data_dir, project_name)
+        if not os.path.isdir(project_path) or project_name.startswith('_'):
+            continue
+            
+        for lang in os.listdir(project_path):
+            lang_path = os.path.join(project_path, lang)
+            
+            if os.path.isdir(lang_path) and not lang.startswith('_'):
+                # [수정] URL로 사용될 ID (괄호 대신 하이픈 사용)
+                project_id = f"{project_name}-{lang}" 
+                
+                # [수정] 화면에 표시될 예쁜 이름 (예: spaace (KO))
+                friendly_name = f"{project_name} ({lang.upper()})"
+                
+                dp = DataProcessor(lang_path)
+                dp.load_data()
+                
+                # 객체 내부에 표시용 이름을 저장해두면 나중에 템플릿에서 쓰기 편합니다.
+                dp.project_display_title = friendly_name 
+                dp.project_name = f"{project_name}"
+                dp.lang = f"{lang}"
+                
+                project_instances[project_id] = dp
+                
+                start_data_loader_thread(project_id)
+                print(f"🚀 Registered: {project_id} as '{friendly_name}'")
                 
 def render_error(error_message, project_name=None):
     try:
         project = project_name or "unknown"
+        all_projects = get_cached_projects()
+        lang = get_language()  # 현재 설정된 언어 가져오기
         return template('error.html',
                        current_project=project,
                        project=project,
                        current_page="",
+                       lang=lang,
+                       all_projects=all_projects,
                        error_message=error_message,
                        project_instances=project_instances,
                        json=json)
@@ -158,7 +187,39 @@ def home_redirect():
         # print("[로그] 기본 경로(/)를 통해 접속함")
         log_access('home_redirect', "UNKNOWN")
     # HTTP 상태 코드 302 (Found) 또는 301 (Moved Permanently)와 함께 리디렉션
-    return redirect(f'/vooi/leaderboard', code=302)
+    return redirect(f'/spaace-ko/leaderboard', code=302)
+@app.route('/set_lang/<lang>')
+def set_language(lang):
+    """
+    언어 설정을 쿠키에 저장하고 이전 페이지로 리디렉션
+    """
+    if lang not in ['ko', 'en']:
+        lang = 'ko'
+    
+    # 쿠키 저장 (유효기간 30일)
+    response.set_cookie('lang', lang, path='/', max_age=30*24*60*60)
+    
+    # 이전 페이지(Referer)로 돌아가기, 없으면 홈으로
+    redirect_url = request.environ.get('HTTP_REFERER', '/')
+    return redirect(redirect_url)
+def get_flag(region='en'):
+    if region == 'en':
+        return "🌐"
+    elif region == 'ko':
+        return "🇰🇷"
+    elif region == 'zh':
+        return "🇨🇳"
+    elif region == 'pt':
+        return "🇵🇹"
+    elif region == 'es':
+        return "🇪🇸"
+    return "🌐"
+
+def get_language():
+    """
+    쿠키에서 언어 설정을 가져옴 (기본값 'ko')
+    """
+    return request.get_cookie('lang', 'ko')
 @app.route('/leaderboard')
 @app.route('/leaderboard/')
 @app.route('/compare')
@@ -169,7 +230,7 @@ def home_redirect():
     """
     log_access('home_redirect', "UNKNOWN")
     # HTTP 상태 코드 302 (Found) 또는 301 (Moved Permanently)와 함께 리디렉션
-    return redirect(f'/vooi/leaderboard', code=302)
+    return redirect(f'/spaace-en/leaderboard', code=302)
 @app.route('/<projectname>/user/')
 @app.route('/<projectname>/user')
 def home_redirect(projectname):
@@ -186,20 +247,32 @@ def home_redirect(projectname):
 def project_index(projectname):
     log_access('user_search', projectname)
     # 🚨 [필수 추가] /favicon.ico 요청이 실수로 앱에 도달했을 때 404 반환
+    lang = get_language()  # 현재 설정된 언어 가져오기
     if projectname.lower() == 'favicon.ico':
         # bottle.abort(404)를 사용하여 명시적으로 404 Not Found를 반환합니다.
         abort(404)
+    if projectname not in project_instances:
+        # favicon.ico나 wp-admin 같은 경로 처리
+        log_access('invalid_access', projectname)
+        return redirect(f'/spaace-en/leaderboard', code=302)
+        # return render_error("존재하지 않는 프로젝트", projectname)
     try:
         dp = get_data_processor(projectname)
         timeframe = request.query.get('timeframe', 'TOTAL')
+        display_project_name = dp.project_name
+        # {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
 
+        display_project_name = get_flag(dp.lang) +" " + display_project_name
         # 모든 사용자 목록 - username과 displayName 함께 가져옴
         all_users = dp.get_all_usernames(timeframe=timeframe)
-        
+        all_projects = get_cached_projects()
         return template('index.html', 
                        current_project=projectname,
+                       display_project_name=display_project_name,
+                       lang=lang,
                        current_page="",
                        project=projectname,
+                       all_projects=all_projects,
                        all_users=all_users,
                        timeframe=timeframe,
                        timeframes=dp.timeframes)
@@ -209,6 +282,12 @@ def project_index(projectname):
 @app.route('/<projectname>/leaderboard')
 def project_leaderboard(projectname):
     log_access('project_leaderboard', projectname)
+    lang = get_language()  # 현재 설정된 언어 가져오기
+    if projectname not in project_instances:
+        # favicon.ico나 wp-admin 같은 경로 처리
+        log_access('invalid_access', projectname)
+        return redirect(f'/spaace-en/leaderboard', code=302)
+        # return render_error("존재하지 않는 프로젝트", projectname)
     try:
         dp = get_data_processor(projectname)
 
@@ -221,14 +300,20 @@ def project_leaderboard(projectname):
         _col_metric = ""
         # ⭐⭐⭐ 1. 컬럼 변수 정의를 여기로 옮깁니다. ⭐⭐⭐
         if metric == 'cSnapsPercent':
-            metric_display_name = "c마쉐"
+            if lang =='ko':
+                metric_display_name = "c마쉐"
+            else:
+                metric_display_name = "cMS"
             mindshare_change_col = 'c_mindshare_change' 
             prev_mindshare_col = 'prev_c_mindshare'
             curr_mindshare_col = 'curr_c_mindshare'
             _col_metric="c"
         else:
             # 기본값 'snapsPercent'
-            metric_display_name = "마쉐" 
+            if lang =='ko':
+                metric_display_name = "마쉐"
+            else:
+                metric_display_name = "MS"
             mindshare_change_col = 'mindshare_change'
             prev_mindshare_col = 'prev_mindshare'
             curr_mindshare_col = 'curr_mindshare'
@@ -236,10 +321,25 @@ def project_leaderboard(projectname):
         # 사용 가능한 타임스탬프 목록
         timestamps = dp.get_available_timestamps(timeframe)
         
-        # 타임스탬프가 선택되지 않았거나 유효하지 않은 경우
-        if not timestamp1 or timestamp1 not in timestamps:
-            timestamp1 = timestamps[-9] if len(timestamps) >= 2 else (timestamps[0] if timestamps else '')
-        
+        # 1. 사용 가능한 타임스탬프 개수 확인
+        num_ts = len(timestamps)
+
+        if num_ts > 0:
+            if not timestamp1 or timestamp1 not in timestamps:
+                # 2. -9 인덱스를 시도하되, 데이터가 부족하면 0번(최초 데이터)을 선택
+                # max(0, num_ts - 9)를 사용하면 데이터가 5개뿐일 때 -4가 아닌 0번 인덱스를 잡습니다.
+                try:
+                    # 원래 의도하신 -9 인덱스 시도
+                    timestamp1 = timestamps[-10]
+                except IndexError:
+                    # -9가 없을 경우, 리스트의 가장 첫 번째([0]) 데이터를 선택 (최대 가용 범위)
+                    timestamp1 = timestamps[0]
+                    
+            if not timestamp2 or timestamp2 not in timestamps:
+                # timestamp2는 리스트의 가장 마지막(최신) 값으로 설정
+                timestamp2 = timestamps[-1]
+        else:
+            timestamp1 = timestamp2 = ''
         if not timestamp2 or timestamp2 not in timestamps:
             timestamp2 = timestamps[-1] if timestamps else ''
         
@@ -259,23 +359,40 @@ def project_leaderboard(projectname):
                 lambda x: f"{x:.4f}" if x > 0 else (f"{x:.4f}" )
             )
             
-            # HTML 테이블 생성
-            table_html = f"""
-            <table id="leaderboardTable" class="table table-striped table-hover">
-                <thead>
-                    <tr>
-                        <th>사용자</th>
-                        <th>이전 순위</th>
-                        <th>현재 순위</th>
-                        <th>순위 변화</th>
-                        <th>이전 {_col_metric}마쉐</th>
-                        <th>현재 {_col_metric}마쉐</th>
-                        <th>{_col_metric}마쉐 변화</th>
-                    </tr>
-                </thead>
-                <tbody>
-            """
-            
+            if lang == 'ko':
+                # HTML 테이블 생성
+                table_html = f"""
+                <table id="leaderboardTable" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>사용자</th>
+                            <th>이전 순위</th>
+                            <th>현재 순위</th>
+                            <th>순위 변화</th>
+                            <th>이전 {_col_metric}마쉐</th>
+                            <th>현재 {_col_metric}마쉐</th>
+                            <th>{_col_metric}마쉐 변화</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                """
+            else:
+                                # HTML 테이블 생성
+                table_html = f"""
+                <table id="leaderboardTable" class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Pre Rank</th>
+                            <th>Cur Rank</th>
+                            <th>Rank Change</th>
+                            <th>Pre {_col_metric}MS</th>
+                            <th>Cur {_col_metric}MS</th>
+                            <th>{_col_metric}MS Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                """
             for i, row in enumerate(compare_data.itertuples(), 1):
                 # 순위 변화에 따른 스타일 설정
                 rank_change_class = "text-success" if row.rank_change > 0 else ("text-danger" if row.rank_change < 0 else "")
@@ -322,11 +439,19 @@ def project_leaderboard(projectname):
                 formatted_timestamps[ts] = dt.strftime('%Y-%m-%d %H:%M')
             except:
                 formatted_timestamps[ts] = ts
+        all_projects = get_cached_projects()
+        display_project_name = dp.project_name
+        # {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
+
+        display_project_name = get_flag(dp.lang) +" " + display_project_name
         
         return template('leaderboard.html', 
                        project=projectname,
+                       lang=lang,
+                       display_project_name=display_project_name,
                        current_project=projectname,
                        current_page="leaderboard",
+                       all_projects=all_projects,
                        timeframe=timeframe,
                        timeframes=dp.timeframes,
                        timestamps=timestamps,
@@ -345,8 +470,17 @@ def project_leaderboard(projectname):
 @app.route('/<projectname>/user/<username>')
 def project_user_analysis(projectname,username):
     log_access('user', projectname, username)
+    lang = get_language()  # 현재 설정된 언어 가져오기
+
+    if projectname not in project_instances:
+        # favicon.ico나 wp-admin 같은 경로 처리
+        log_access('invalid_access', projectname)
+        return redirect(f'/spaace-en/leaderboard', code=302)
+        # return render_error("존재하지 않는 프로젝트", projectname)
     try:
+        # print(projectname)
         dp = project_instances[projectname]
+        # print(dp)
         # user_info = dp.get_user_info(username)
         
         # URL 쿼리 파라미터에서 metric 가져오기
@@ -355,20 +489,33 @@ def project_user_analysis(projectname,username):
         # timeframe = request.query.get('timeframe', dp.timeframes[0])
         
         user_info = dp.get_user_info_by_timeframe(username, timeframe)
+        if lang=='ko':
+            title = f"{user_info['displayName']}의 기간별 변화 분석"
+            rank = f"순위"
+        else:
+            title = f"{user_info['displayName']}'s changes over time"
+            rank = f"Rank"
         # metric에 따라 컬럼 이름 동적 결정
         if metric == 'cSnapsPercent':
             rank_col = 'cSnapsPercentRank'
             mindshare_col = 'cSnapsPercent'
-            mindshare_display_name = 'c마인드쉐어'
-            rank_display_name = 'c순위' 
+            if lang=='ko':
+                mindshare_display_name = 'c마인드쉐어'
+                rank_display_name = 'c순위' 
+            else:
+                mindshare_display_name = 'cMS'
+                rank_display_name = 'cRank' 
         else: # 기본값: snapsPercent
             rank_col = 'rank'
             mindshare_col = 'snapsPercent'
-            mindshare_display_name = '마인드쉐어'
-            rank_display_name = '순위'
-
+            if lang=='ko':
+                mindshare_display_name = '마인드쉐어'
+                rank_display_name = '순위' 
+            else:
+                mindshare_display_name = 'MS'
+                rank_display_name = 'Rank' 
         user_data = dp.get_user_analysis(username)
-
+        # print(user_data)
         # ⭐⭐⭐ [수정 1] 4행 1열 서브플롯 생성 및 보조 Y축 설정 ⭐⭐⭐
         # 4개 기간별 차트를 세로로 나열
         fig = make_subplots(
@@ -392,7 +539,7 @@ def project_user_analysis(projectname,username):
                         x=df['timestamp'], 
                         y=df[rank_col], 
                         mode='lines+markers',
-                        name=f'순위',
+                        name=rank,
                         line=dict(width=1, color='#FF0000'), # 파란색 계열
                         marker=dict(size=2, symbol='circle'),
                         showlegend=False,
@@ -414,11 +561,10 @@ def project_user_analysis(projectname,username):
                     row=row_num, col=1, secondary_y=True
                 )
                 
-                
                 # Y축 설정
                 # 주 Y축 (순위): 제목 설정 및 순위이므로 Y축 반전
                 fig.update_yaxes(
-                    title_text=f"순위", 
+                    title_text=rank, 
                     autorange="reversed", 
                     row=row_num, col=1, secondary_y=False,
                     gridcolor='lightgray',
@@ -439,13 +585,12 @@ def project_user_analysis(projectname,username):
                     fixedrange=True
                 )
                 
-
             # ⭐⭐⭐ [수정 3] 레이아웃 및 범례 설정 ⭐⭐⭐
             fig.update_layout(
                 # 4개의 차트가 세로로 나열되므로 높이 조정
                 height=1200, 
                 width=None, # 클라이언트 CSS에 너비를 맡김
-                title_text=f"{user_info['displayName']}의 기간별 변화 분석",
+                title_text= title,
                 hovermode="x unified", # 툴팁을 통합하여 가독성 향상
                 font=dict(size=12),
                 # dragmode="hovermode",
@@ -492,13 +637,23 @@ def project_user_analysis(projectname,username):
                                     )
         try:
             all_users = dp.get_all_users()
+            all_projects = get_cached_projects()
+            
+            display_project_name = dp.project_name
+            # {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
+            display_project_name = get_flag(dp.lang) +" " + display_project_name
+
         except AttributeError:
             # 안전을 위해 DataProcessor에 해당 메서드가 없을 경우 빈 리스트로 처리
             all_users = []
+            all_projects = []
         return template('user.html', 
                        project=projectname,
+                       display_project_name=display_project_name,
+                       lang=lang,
                        current_project=projectname,
                        current_page="user",
+                       all_projects=all_projects,
                        username=username,
                        user_chart=user_chart,
                        user_info=user_info,

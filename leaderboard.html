@@ -1,5 +1,68 @@
 <!DOCTYPE html>
-<html lang="ko">
+<%
+    i18n = {
+        'ko': {
+			'pre': '이전',
+			'cur': '현재',
+			'change': '변화',
+			'ms': '마쉐',
+            'title_suffix': '리더보드 변화 분석',
+            'user_analysis': '사용자 분석',
+            'leaderboard_analysis': '리더보드 분석',
+            'data_standard': '데이터 기준',
+            'metric_standard': '지표 기준',
+            'compare_btn': '비교하기',
+            'prev_point': '이전 시점',
+            'curr_point': '현재 시점',
+			'recent_9hour': '최근 9시간',
+			'Analysis_Result': '분석 결과',
+            'rank': '순위',
+            'user': '사용자',
+			'pre_rank': '이전 순위',
+			'curr_rank': '현재 순위',
+            'rank_change': '순위 변화',
+			'pre_ms': '이전 마쉐',
+			'curr_ms': '현재 마쉐',
+			'ms_change': '마쉐 변화',
+			'result': '분석 결과',
+            'search_placeholder': '사용자 이름을 입력하세요',
+            'close': '닫기',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+			'pre': 'Pre',
+			'cur': 'Cur',
+			'change': 'Change',
+			'ms': 'MS',
+            'title_suffix': 'Leaderboard Analysis',
+            'user_analysis': 'User Analysis',
+            'leaderboard_analysis': 'Leaderboard',
+            'data_standard': 'Time',
+            'metric_standard': 'Metric',
+            'compare_btn': 'COMPARE',
+            'prev_point': 'Prev Point',
+            'curr_point': 'Curr Point',
+			'recent_9hour': 'Recent 9H',
+			'Analysis_Result': 'Analysis Result',
+            'rank': 'Rank',
+            'user': 'User',
+			'pre_rank': 'Pre Rank',
+			'curr_rank': 'Cur Rank',
+            'rank_change': 'Rank Change',
+			'pre_ms': 'Pre MS',
+			'curr_ms': 'Cur MS',
+			'ms_change': 'MS Change',
+			'result': 'Analysis Result',
+            'search_placeholder': 'Enter username...',
+            'close': 'Close',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +75,7 @@
 	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 
     <style>
 		#creatorModal .modal-content {
@@ -159,13 +223,13 @@
 		}
 		
 		
-		.table-responsive td:nth-of-type(1):before { content: "사용자"; }
-		.table-responsive td:nth-of-type(2):before { content: "이전 순위"; }
-		.table-responsive td:nth-of-type(3):before { content: "현재 순위"; }
-		.table-responsive td:nth-of-type(4):before { content: "순위 변화"; }
-		.table-responsive td:nth-of-type(5):before { content: "이전 {{_col_metric}}마쉐"; }
-		.table-responsive td:nth-of-type(6):before { content: "현재 {{_col_metric}}마쉐"; } 
-		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}마쉐 변화"; } 
+		.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
+		.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
+		.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
+		.table-responsive td:nth-of-type(4):before { content: "{{t['rank_change']}}"; }
+		.table-responsive td:nth-of-type(5):before { content: "{{t['pre']}} {{_col_metric}}{{t['ms']}}"; }
+		.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{_col_metric}}{{t['ms']}}"; } 
+		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}{{t['ms']}} {{t['change']}}"; } 
 		
 		
 		.table-responsive td:nth-of-type(1) {
@@ -218,6 +282,11 @@
 			text-decoration: none;
 			color: inherit; 
 		}
+		img.emoji {
+			height: 1em;
+			width: 1em;
+			margin: 0 .05em 0 .1em;
+			vertical-align: -0.1em;
     </style>
 </head>
 <body>
@@ -227,17 +296,38 @@
             <img src="/static/cookie_shark.png" width="32" height="32" class="me-2">
         <span class="text-info me-1 fw-bold" style="padding: 5; font-size: 1.2rem; letter-spacing: 1px;">SHARKAPP</span>
 
-            <div class="dropdown">
-                <button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    {{project.upper()}}
-                </button>
-                <ul class="dropdown-menu shadow border-0" style="padding: 5;" aria-labelledby="projectDropdown">
-                    <li><a class="dropdown-item" href="/vooi/leaderboard">VOOI</a></li>
-                    <li><a class="dropdown-item" href="/spaace/leaderboard">SPAACE</a></li>
-                    <li><a class="dropdown-item" href="/superform/leaderboard">SUPERFORM</a></li>
-                    <li><a class="dropdown-item" href="/rayls/leaderboard">RAYLS</a></li>
-                </ul>
-            </div>
+		<div class="dropdown">
+			<button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+				<% 
+					# 이모티콘 매핑 사전
+					flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳','pt': '🇵🇹','es': '🇪🇸'}
+					
+					# 뒤에서부터 첫 번째 '-'를 기준으로 한 번만 분리
+					# 예: 'foru-ai-en' -> ['foru-ai', 'en']
+					current_parts = project.rsplit('-', 1)
+					current_name = current_parts[0].upper()
+					current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
+					current_flag = flags.get(current_lang, '')
+				%>
+				{{current_flag}} {{current_name}}
+			</button>
+			<ul class="dropdown-menu shadow border-0" style="padding: 5px;" aria-labelledby="projectDropdown">
+				% for p in all_projects:
+					<% 
+						# 각 프로젝트 목록도 동일하게 뒤에서부터 분리
+						p_parts = p.rsplit('-', 1)
+						p_name = p_parts[0].upper()
+						p_lang = p_parts[1].lower() if len(p_parts) > 1 else ''
+						p_flag = flags.get(p_lang, '')
+					%>
+					<li>
+						<a class="dropdown-item {{'active' if p == project else ''}}" href="/{{p}}/leaderboard">
+							{{p_flag}} {{p_name}}
+						</a>
+					</li>
+				% end
+			</ul>
+		</div>
         </div>
 
         
@@ -248,17 +338,21 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-lg-4 me-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="/{{project}}/">사용자 분석</a>
+					<a class="nav-link {{'active' if current_page == 'user' else ''}}" href="/{{project}}/">{{t['user_analysis']}}</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link active" href="/{{project}}/leaderboard">리더보드 분석</a>
+					<a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="/{{project}}/leaderboard">{{t['leaderboard_analysis']}}</a>
                 </li>
             </ul>
-            
-            <div class="creator-badge" data-bs-toggle="modal" data-bs-target="#creatorModal">
+					
+            <div class="creator-badge me-2" data-bs-toggle="modal" data-bs-target="#creatorModal">
                 <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
                 <span>Created by ohoshark</span>
             </div>
+			<div class="btn-group btn-group-sm me-3">
+					<a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
+					<a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
+			</div>
         </div>
     </div>
 </nav>
@@ -268,14 +362,14 @@
         
         <div class="card timestamp-selector">
             <div class="card-header">
-                <h3>{{project.upper()}} 리더보드 변화 분석</h3>
+                <h3 class="mb-0">{{display_project_name.upper()}} {{t['title_suffix']}}</h3>
             </div>
 				<div class="card-body">
-					<form method="get" action="/{{project}}/leaderboard" id="comparisonForm">
+					<form method="get" action="../{{project}}/leaderboard" id="comparisonForm">
 						<div class="row mb-3">
 							<div class="col-md-4">
-								<label for="timeframe" class="form-label">데이터 기준:</label>
-								<select class="form-select" id="timeframe" name="timeframe" onchange="this.form.submit()">
+								<label class="form-label fw-bold">{{t['data_standard']}}</label>
+								<select class="form-select" id="timeframe" name="timeframe" onchange="updateFilters()">
 									% for tf in timeframes:
 										<option value="{{ tf }}" {{ 'selected' if tf == timeframe else '' }}>{{ tf }}</option>
 									% end
@@ -283,7 +377,7 @@
 							</div>
 							
 							<div class="col-md-4">
-								<label for="metric" class="form-label">지표 기준:</label>
+								<label class="form-label fw-bold">{{t['metric_standard']}}</label>
 								<select class="form-select" id="metric" name="metric" onchange="this.form.submit()">
 									<option value="snapsPercent" {{ 'selected' if metric == 'snapsPercent' else '' }}>Mindshare</option>
 									<option value="cSnapsPercent" {{ 'selected' if metric == 'cSnapsPercent' else '' }}>cMindshare</option>
@@ -294,11 +388,11 @@
 						<div class="col-12">
 							<div class="d-flex justify-content-between mb-3">
 								<div class="text-start">
-									<strong>이전 시점:</strong> 
+									<strong>{{t['prev_point']}}</strong> 
 									<span id="slider-timestamp1" class="text-muted"></span>
 								</div>
 								<div class="text-end">
-									<strong>현재 시점:</strong> 
+									<strong>{{t['curr_point']}}</strong> 
 									<span id="slider-timestamp2" class="text-muted"></span>
 								</div>
 							</div>
@@ -309,22 +403,21 @@
 							<input type="hidden" id="timestamp2" name="timestamp2" value="{{ timestamp2 }}">
 						</div>
 					</div>
-					
-					</form>
+				
 				<div class="d-flex justify-content-end mt-5">
-				    <form action="../{{project}}/leaderboard" method="get">
-					<input type="hidden" name="timeframe" value="{{timeframe}}">
-					<input type="hidden" name="metric" value="{{metric}}">
-						<button type="submit" class="btn btn-primary me-3" >최근 9시간</button></form>
-					<button type="submit" class="btn btn-primary" form="comparisonForm">비교하기</button>
+					<button type="button" class="btn btn-primary me-3" onclick="resetToRecent()">
+							{{t['recent_9hour']}}
+						</button>
+						<button type="submit" class="btn btn-primary px-4">{{t['compare_btn']}}</button>
 				</div>
+				</form>
 			</div>
 		</div>
         
         <div class="card comparison-table">
             <div class="card-header">
                 <h3>
-                    분석 결과 
+                    {{t['result']}} 
                     <small class="text-muted">
                         ({{ formatted_timestamps.get(timestamp1, timestamp1) }} → {{ formatted_timestamps.get(timestamp2, timestamp2) }})
                     </small>
@@ -515,44 +608,46 @@
 		const $searchResults = $('#searchResults');
 		const searchModal = new bootstrap.Modal(document.getElementById('searchModal'));
 		
-		function searchUsers(query) {
-			$searchResults.empty();
-			if (query.length < 2) { 
-				$searchResults.append('<div class="list-group-item">최소 2글자 이상 입력해주세요.</div>');
-				return;
-			}
+// 기존 코드 부분을 아래와 같이 수정
+function searchUsers(query) {
+    $searchResults.empty();
+    if (query.length < 2) { 
+        $searchResults.append('<div class="list-group-item">최소 2글자 이상 입력해주세요.</div>');
+        return;
+    }
 
-			const lowerQuery = query.toLowerCase();
-			const foundUsers = [];
-			
-			table.rows().every(function() { 
-				const rowData = this.data();
-				const usernameCellHtml = rowData[0];
-				const username = $(usernameCellHtml).text().trim(); 
-				
-				if (username.toLowerCase().includes(lowerQuery)) {
-					foundUsers.push({
-						username: username,
-						data: rowData
-					});
-				}
-			});
+    const lowerQuery = query.toLowerCase();
+    const foundUsers = [];
+    
+    // table 변수가 정상적으로 DataTable 객체인지 확인 필요
+    table.rows().every(function() { 
+        const rowData = this.data();
+        // i18n으로 인해 HTML이 포함될 수 있으므로 jQuery를 이용해 텍스트만 추출
+        // 만약 첫 번째 컬럼(0)이 사용자 이름이 아니라면 인덱스를 수정해야 합니다.
+        const username = $('<div>' + rowData[0] + '</div>').text().trim(); 
+        
+        if (username.toLowerCase().includes(lowerQuery)) {
+            foundUsers.push({
+                username: username,
+                index: this.index() // 행 인덱스 저장
+            });
+        }
+    });
 
+    if (foundUsers.length === 0) {
+        $searchResults.append('<div class="list-group-item list-group-item-warning">일치하는 사용자가 없습니다.</div>');
+        return;
+    }
 
-			if (foundUsers.length === 0) {
-				$searchResults.append('<div class="list-group-item list-group-item-warning">일치하는 사용자가 없습니다.</div>');
-				return;
-			}
-
-			foundUsers.forEach(function(user) {
-				const $item = $(
-					'<a href="#" class="list-group-item list-group-item-action" ' +
-					'data-username="' + user.username + '">' + 
-					user.username + '</a>'
-				);
-				$searchResults.append($item);
-			});
-		}
+    foundUsers.forEach(function(user) {
+        const $item = $(
+            '<a href="#" class="list-group-item list-group-item-action" ' +
+            'data-username="' + user.username + '">' + 
+            user.username + '</a>'
+        );
+        $searchResults.append($item);
+    });
+}
 
 		let searchTimer;
 		$usernameInput.on('keyup', function() {
@@ -563,43 +658,40 @@
 			}, 300);
 		});
 
-		$searchResults.on('click', 'a.list-group-item-action', function(e) {
-			e.preventDefault();
-			
-			const usernameToFind = $(this).data('username');
-			let $targetRow = null;
+$searchResults.on('click', 'a.list-group-item-action', function(e) {
+    e.preventDefault();
+    const usernameToFind = $(this).data('username');
+    let $targetRow = null;
 
-			table.rows().every(function() {
-				const rowData = this.data();
-				const cellText = $(rowData[0]).text().trim(); 
-				if (cellText === usernameToFind) {
-					$targetRow = $(this.node()); 
-					return false; 
-				}
-			});
+    table.rows().every(function() {
+        const rowData = this.data();
+        const cellText = $('<div>' + rowData[0] + '</div>').text().trim(); 
+        if (cellText === usernameToFind) {
+            $targetRow = $(this.node()); 
+            return false; 
+        }
+    });
 
-			if ($targetRow && $targetRow.length) {
-				table.search('').draw();
-				
-				$('html, body').animate({
-					scrollTop: $targetRow.offset().top - 100 
-				}, 500);
+    if ($targetRow && $targetRow.length) {
+        searchModal.hide(); // 이동 전 모달 먼저 닫기
+        
+        setTimeout(function() {
+            $('html, body').animate({
+                scrollTop: $targetRow.offset().top - 150 
+            }, 500);
 
-				$targetRow.css('background-color', '#ffffe0'); 
-				setTimeout(function() {
-					$targetRow.css('background-color', ''); 
-				}, 2000);
-				
-				searchModal.hide();
-			} else {
-				alert('테이블에서 사용자를 찾을 수 없습니다.');
-			}
-		});
+            $targetRow.addClass('table-warning'); // 부트스트랩 클래스 활용
+            setTimeout(function() {
+                $targetRow.removeClass('table-warning');
+            }, 2000);
+        }, 300); // 모달이 닫히는 애니메이션 시간 확보
+    }
+});
 
 		document.getElementById('searchModal').addEventListener('shown.bs.modal', function () {
 			$('#usernameInput').focus();
 		});
-			
+		twemoji.parse(document.body);
 		});
 	</script>
 
@@ -615,12 +707,12 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown">
             <li class="dropdown-header">정렬 기준 선택</li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">이전 순위</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">현재 순위</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">순위 변화</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">이전 {{ metric_display_name }}</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">현재 {{ metric_display_name }}</a></li>
-            <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{ metric_display_name }} 변화</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="desc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="desc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">{{t['pre']}} {{ metric_display_name }}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">{{t['cur']}} {{ metric_display_name }}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{ metric_display_name }} {{t['change']}}</a></li>
         </ul>
     </div>
     
@@ -663,7 +755,7 @@
                 <div class="donation-card mb-2" onclick="copyWalletAddress()">
                     <div class="text-info fw-bold mb-1" style="font-size: 0.7rem;">ENS DONATION</div>
                     <div class="fw-bold text-dark">ohoshark.eth</div>
-                    <div class="text-muted mt-1" style="font-size: 0.65rem;">클릭하여 주소 복사 🦈</div>
+                    <div class="text-muted mt-1" style="font-size: 0.65rem;">{{t['click_to_copy']}}</div>
                 </div>
 				<div class="mb-0">
 					<a href="https://rul.kr/Xtracker" target="_blank" class="btn btn-outline-dark btn-sm rounded-pill w-100 fw-bold shadow-sm custom-cookie-btn" style="background-color: #aaf0d1; font-size: 0.8rem; border-width: 1px; color: #000; padding: 8px 15px; line-height: 1.2;">
@@ -678,7 +770,7 @@
 					 role="alert" aria-live="assertive" aria-atomic="true" 
 					 style="border-radius: 12px; background-color: rgba(0, 0, 0, 0.7); min-height: auto;"> <div class="d-flex justify-content-center">
 						<div class="toast-body text-center p-2" style="font-size: 0.85rem; line-height: 1.2;">
-							지갑 주소가 복사되었습니다! 🦈
+							{{t['copy_success']}}
 						</div>
 					</div>
 				</div>
@@ -688,24 +780,25 @@
     </div>
 </div>
 <div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered"> <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="searchModalLabel">사용자 검색 및 이동</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label for="usernameInput" class="form-label">검색할 사용자 이름:</label>
-          <input type="text" class="form-control" id="usernameInput" placeholder="사용자 이름을 입력하세요">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{t['user_analysis']}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">{{t['user']}}:</label>
+                    <input type="text" class="form-control" id="usernameInput" placeholder="{{t['search_placeholder']}}" autocomplete="off">
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{t['close']}}</button>
+            </div>
         </div>
-        <div id="searchResults" class="list-group">
-          </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
-      </div>
     </div>
-  </div>
 </div>
 <script>
 	const scrollTopButton = document.getElementById('fabScrollTop');
@@ -743,7 +836,46 @@
 			console.error('복사 실패:', err);
 		});
 	}
+	function resetToRecent() {
+		// 1. 현재 화면에서 필요한 값만 읽어옵니다.
+		const tf = document.getElementById('timeframe').value;
+		const mt = document.getElementById('metric').value; // metric도 유지하고 싶을 경우
+		
+		const project = "{{project}}";
+		
+		// 2. [핵심] 현재 URL의 파라미터를 싹 무시하고, 
+		// 기본 경로에 필요한 값만 딱 붙여서 이동합니다.
+		const newUrl = `/${project}/leaderboard?timeframe=${tf}&metric=${mt}`;
+		
+		// 이동
+		window.location.href = newUrl;
+	}
 	</script>
+</script>
+<script>
+	function updateFilters() {
+		// 1. 현재 선택된 두 가지 필터 값만 가져옴
+		const tf = document.getElementById('timeframe').value;
+		const mt = document.getElementById('metric').value;
+		
+		// 2. 프로젝트 경로 (서버에서 내려준 변수 활용)
+		const project = "{{project}}";
+		
+		// 3. timestamp를 제외한 순수 필터값만 쿼리 스트링으로 구성
+		// window.location.pathname을 사용하여 현재 주소 뒤의 파라미터를 초기화함
+		window.location.href = window.location.pathname + "?timeframe=" + tf + "&metric=" + mt;
+	}
+
+	// 기존에 만들었던 resetToRecent도 위 함수를 재사용하면 깔끔합니다.
+	function resetToRecent() {
+		updateFilters();
+	}
+</script>
+<script>
+  $(document).ready(function() {
+    // 특정 요소(예: 바디 전체) 내의 이모티콘을 이미지로 변환
+    twemoji.parse(document.body);
+  });
 </script>
 </body>
 </html>
