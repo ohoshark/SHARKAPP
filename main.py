@@ -748,6 +748,22 @@ def project_user_analysis(projectname,username):
             df = user_data[tf]
             
             if not df.empty:
+                # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
+                if len(df) > 0:
+                    latest_timestamp = df['timestamp'].max()
+                    # 현재 시점의 데이터 확인
+                    timestamps_in_tf = dp.get_available_timestamps(tf)
+                    if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                        current_timestamp = pd.Timestamp(max(timestamps_in_tf))
+                        # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                        if latest_timestamp < current_timestamp:
+                            # 더미 데이터 추가 (rank=9999, mindshare=0)
+                            dummy_row = pd.DataFrame({
+                                'timestamp': [current_timestamp],
+                                rank_col: [9999],
+                                mindshare_col: [0]
+                            })
+                            df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
                 # 1. 순위 변화 (주 Y축: secondary_y=False)
                 fig.add_trace(
                     go.Scatter(
@@ -1275,6 +1291,22 @@ def wallchain_user_analysis(projectname, username):
                 data = user_data.get(tf, pd.DataFrame())
                 
                 if not data.empty:
+                    # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
+                    if len(data) > 0:
+                        latest_timestamp = data['timestamp'].max()
+                        # 현재 시점의 데이터 확인
+                        timestamps_in_tf = dp.get_available_timestamps(tf)
+                        if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                            current_timestamp = pd.Timestamp(max(timestamps_in_tf))
+                            # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                            if latest_timestamp < current_timestamp:
+                                # 더미 데이터 추가 (position=9999, mindshare=0)
+                                dummy_row = pd.DataFrame({
+                                    'timestamp': [current_timestamp],
+                                    'position': [9999],
+                                    'mindsharePercentage': [0]
+                                })
+                                data = pd.concat([data, dummy_row], ignore_index=True).sort_values('timestamp')
                     fig.add_trace(
                         go.Scatter(
                             x=data['timestamp'], y=data['position'],
