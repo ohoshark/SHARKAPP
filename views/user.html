@@ -95,7 +95,7 @@
                             <h6 class="card-subtitle mb-2 text-muted fw-bold">{{ tf }}</h6>
                             <div class="mb-2">
                                 <small class="text-muted d-block">{{ t['rank'] if metric == 'snapsPercent' else t['crank'] }}</small>
-                                <h3 class="mb-0 text-primary">{{ tf_rank if tf_rank != '-' else '-' }}</h3>
+                                <h3 class="mb-0 text-primary">{{ tf_rank if tf_rank != '-' else 'out' }}</h3>
                             </div>
                             <div>
                                 <small class="text-muted d-block">{{ t['mindshare'] if metric == 'snapsPercent' else t['cmindshare'] }}</small>
