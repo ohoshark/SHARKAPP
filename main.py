@@ -1387,13 +1387,6 @@ def wallchain_user_analysis(projectname, username):
                 }
             )
         
-        # 데이터가 있는 timeframe만 필터링 (UI 표시용)
-        available_timeframes_ui = []
-        for tf in dp.timeframes:
-            timestamps_check = dp.get_available_timestamps(tf)
-            if timestamps_check:
-                available_timeframes_ui.append(tf)
-        
         all_users = dp.get_all_usernames(timeframe=timeframe)
         all_wallchain_projects = get_cached_wallchain_projects()
         all_cookie_projects = get_cached_projects()
@@ -1416,7 +1409,7 @@ def wallchain_user_analysis(projectname, username):
                        user_info=user_info,
                        all_users=json.dumps(all_users),
                        timeframe=timeframe,
-                       timeframes=available_timeframes_ui,
+                       timeframes=available_timeframes,
                        user_info_by_timeframe=user_info_by_timeframe,
                        json=json)
     except ValueError as e:
