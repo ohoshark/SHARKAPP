@@ -446,8 +446,8 @@ def project_index(projectname):
         # {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳'}
 
         display_project_name = get_flag(dp.lang) +" " + display_project_name
-        # 모든 사용자 목록 - username과 displayName 함께 가져옴
-        all_users = dp.get_all_usernames(timeframe=timeframe)
+        # 모든 사용자 목록 - 7D, 14D, 30D, TOTAL에서 중복 제거하여 가져옴
+        all_users = dp.get_all_usernames_from_multiple_timeframes(['7D', '14D', '30D', 'TOTAL'])
         all_projects = get_cached_projects()
         all_wallchain_projects = get_cached_wallchain_projects()
         grouped_projects = get_grouped_projects()
@@ -730,122 +730,123 @@ def project_user_analysis(projectname,username):
                 mindshare_display_name = 'MS'
                 rank_display_name = 'Rank' 
         user_data = dp.get_user_analysis(username)
-        # print(user_data)
-        # ⭐⭐⭐ [수정 1] 4행 1열 서브플롯 생성 및 보조 Y축 설정 ⭐⭐⭐
-        # 4개 기간별 차트를 세로로 나열
-        fig = make_subplots(
-            rows=4, cols=1, 
-            subplot_titles=('7D', '14D', '30D', 'TOTAL'),
-            vertical_spacing=0.12, # 차트 간 간격 조정
-            # 모든 서브플롯에 보조 Y축(secondary_y) 활성화
-            specs=[[{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}], [{"secondary_y": True}]]
-        )
         
-        # ⭐⭐⭐ [수정 2] 차트 그리기 루프: 순위/마쉐를 하나의 서브플롯에 추가 ⭐⭐⭐
-        # dp.timeframes = ['7D', '14D', '30D', 'TOTAL'] 순서를 따름
-        for i, tf in enumerate(dp.timeframes):
-            row_num = i + 1 # 1부터 4까지의 행 번호
-            df = user_data[tf]
-            
+        # 데이터가 있는 timeframe만 필터링
+        available_timeframes = []
+        for tf in dp.timeframes:
+            df = user_data.get(tf, pd.DataFrame())
             if not df.empty:
-                # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
-                if len(df) > 0:
-                    latest_timestamp = df['timestamp'].max()
-                    # 현재 시점의 데이터 확인
-                    timestamps_in_tf = dp.get_available_timestamps(tf)
-                    if timestamps_in_tf and len(timestamps_in_tf) > 0:
-                        current_timestamp = pd.Timestamp(max(timestamps_in_tf))
-                        # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
-                        if latest_timestamp < current_timestamp:
-                            # 더미 데이터 추가 (rank=9999, mindshare=0)
-                            dummy_row = pd.DataFrame({
-                                'timestamp': [current_timestamp],
-                                rank_col: [9999],
-                                mindshare_col: [0]
-                            })
-                            df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
-                # 1. 순위 변화 (주 Y축: secondary_y=False)
-                fig.add_trace(
-                    go.Scatter(
-                        x=df['timestamp'], 
-                        y=df[rank_col], 
-                        mode='lines+markers',
-                        name=rank,
-                        line=dict(width=1, color='#FF0000'), # 파란색 계열
-                        marker=dict(size=2, symbol='circle'),
-                        showlegend=False,
-                    ),
-                    row=row_num, col=1, secondary_y=False
-                )
+                available_timeframes.append(tf)
+        
+        # 데이터가 있는 경우에만 차트 생성
+        if not available_timeframes:
+            user_chart = ""
+        else:
+            # subplot_titles를 available_timeframes 기준으로 동적 생성
+            subplot_titles_list = tuple(available_timeframes)
+            
+            # 동적으로 서브플롯 생성
+            fig = make_subplots(
+                rows=len(available_timeframes), cols=1, 
+                subplot_titles=subplot_titles_list,
+                vertical_spacing=0.12,
+                specs=[[{"secondary_y": True}] for _ in available_timeframes]
+            )
+            
+            # ⭐⭐⭐ [수정 2] 차트 그리기 루프: 순위/마쉐를 하나의 서브플롯에 추가 ⭐⭐⭐
+            # available_timeframes만 사용
+            for i, tf in enumerate(available_timeframes):
+                row_num = i + 1
+                df = user_data[tf]
                 
-                # 2. 마인드쉐어 변화 (보조 Y축: secondary_y=True)
-                fig.add_trace(
-                    go.Scatter(
-                        x=df['timestamp'], 
-                        y=df[mindshare_col], 
-                        mode='lines+markers',
-                        name=f'{mindshare_display_name}',
-                        line=dict(width=1, color='#1F77B4', dash='dot'), # 주황색 계열, 점선으로 구분
-                        marker=dict(size=2, symbol='square'),
-                        showlegend=False,
-                    ),
-                    row=row_num, col=1, secondary_y=True
-                )
-                
-                # Y축 설정
-                # 주 Y축 (순위): 제목 설정 및 순위이므로 Y축 반전
-                fig.update_yaxes(
-                    title_text=rank, 
-                    autorange="reversed", 
-                    row=row_num, col=1, secondary_y=False,
-                    gridcolor='lightgray',
-                    zeroline=True,
-                    fixedrange=True
-                )
-                
-                # 보조 Y축 (마인드쉐어): 제목 설정
-                fig.update_yaxes(
-                    title_text=f"{mindshare_display_name} (%)", 
-                    row=row_num, col=1, secondary_y=True,
-                    gridcolor='rgba(0,0,0,0)', # 보조축의 그리드라인은 투명하게 하여 중복 방지
-                    fixedrange=True
-                )
-                # ⭐ [추가 3] X축 설정: X축 드래그/줌 비활성화 ⭐
-                fig.update_xaxes(
-                    row=row_num, col=1, 
-                    fixedrange=True
-                )
-                
+                if not df.empty:
+                    # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
+                    if len(df) > 0:
+                        latest_timestamp = df['timestamp'].max()
+                        # 현재 시점의 데이터 확인
+                        timestamps_in_tf = dp.get_available_timestamps(tf)
+                        if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                            current_timestamp = pd.Timestamp(max(timestamps_in_tf))
+                            # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                            if latest_timestamp < current_timestamp:
+                                # 더미 데이터 추가 (rank=9999, mindshare=0)
+                                dummy_row = pd.DataFrame({
+                                    'timestamp': [current_timestamp],
+                                    rank_col: [9999],
+                                    mindshare_col: [0]
+                                })
+                                df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
+                    # 1. 순위 변화 (주 Y축: secondary_y=False)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df['timestamp'], 
+                            y=df[rank_col], 
+                            mode='lines+markers',
+                            name=rank,
+                            line=dict(width=1, color='#FF0000'), # 파란색 계열
+                            marker=dict(size=2, symbol='circle'),
+                            showlegend=False,
+                        ),
+                        row=row_num, col=1, secondary_y=False
+                    )
+                    
+                    # 2. 마인드쉐어 변화 (보조 Y축: secondary_y=True)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=df['timestamp'], 
+                            y=df[mindshare_col], 
+                            mode='lines+markers',
+                            name=f'{mindshare_display_name}',
+                            line=dict(width=1, color='#1F77B4', dash='dot'), # 주황색 계열, 점선으로 구분
+                            marker=dict(size=2, symbol='square'),
+                            showlegend=False,
+                        ),
+                        row=row_num, col=1, secondary_y=True
+                    )
+                    
+                    # Y축 설정
+                    # 주 Y축 (순위): 제목 설정 및 순위이므로 Y축 반전
+                    fig.update_yaxes(
+                        title_text=rank, 
+                        autorange="reversed", 
+                        row=row_num, col=1, secondary_y=False,
+                        gridcolor='lightgray',
+                        zeroline=True,
+                        fixedrange=True
+                    )
+                    
+                    # 보조 Y축 (마인드쉐어): 제목 설정
+                    fig.update_yaxes(
+                        title_text=f"{mindshare_display_name} (%)", 
+                        row=row_num, col=1, secondary_y=True,
+                        gridcolor='rgba(0,0,0,0)', # 보조축의 그리드라인은 투명하게 하여 중복 방지
+                        fixedrange=True
+                    )
+                    # X축 설정
+                    fig.update_xaxes(
+                        row=row_num, col=1, 
+                        fixedrange=True
+                    )
+            
+            # 차트 높이를 timeframe 개수에 따라 동적 조정
+            chart_height = 300 * len(available_timeframes)
+            
             # ⭐⭐⭐ [수정 3] 레이아웃 및 범례 설정 ⭐⭐⭐
             fig.update_layout(
-                # 4개의 차트가 세로로 나열되므로 높이 조정
-                height=1200, 
+                height=chart_height, 
                 width=None, # 클라이언트 CSS에 너비를 맡김
                 title_text= title,
                 hovermode="x unified", # 툴팁을 통합하여 가독성 향상
                 font=dict(size=12),
                 # dragmode="hovermode",
                 showlegend=False
-                # 범례를 차트 하단 중앙에 배치하여 공간 절약 및 가독성 확보
-                # legend=dict(
-                    # orientation="h", 
-                    # yanchor="bottom", 
-                    # y=-0.1, 
-                    # xanchor="center", 
-                    # x=0.5,
-                    # bgcolor="rgba(255, 255, 255, 0.7)",
-                    # bordercolor="lightgray",
-                    # borderwidth=1
-                # )
             )
             
             # 서브플롯 제목 글꼴 크기 조정
             fig.update_annotations(font_size=30)
             fig.update_annotations(
-                    # 1. 제목의 가로 위치를 서브플롯의 맨 왼쪽(0.0)으로 설정
-                    x=0.0, 
-                    # 2. 제목 텍스트의 '왼쪽 끝'을 위에서 지정한 x=0.0 좌표에 고정
-                    xanchor='left' 
+                x=0.0, 
+                xanchor='left' 
             )   
             user_chart = pio.to_html(fig, 
                                      full_html=False,
@@ -900,7 +901,7 @@ def project_user_analysis(projectname,username):
                        all_users=json.dumps(all_users), # JSON 문자열로 변환
                        timeframe=timeframe,
                        metric=metric, 
-                       timeframes=dp.timeframes,
+                       timeframes=available_timeframes,
                        user_info_by_timeframe=user_info_by_timeframe,
                        rank_col=rank_col,
                        mindshare_col = mindshare_col,
@@ -1007,7 +1008,8 @@ def wallchain_index(projectname):
         if not timeframe:
             timeframe = dp.timeframes[0] if dp.timeframes else '7d'
         
-        all_users = dp.get_all_usernames(timeframe=timeframe)
+        # 모든 timeframe에서 사용자 검색 (중복 제거)
+        all_users = dp.get_all_usernames_from_all_timeframes()
         all_wallchain_projects = get_cached_wallchain_projects()
         all_cookie_projects = get_cached_projects()
         grouped_projects = get_grouped_projects()

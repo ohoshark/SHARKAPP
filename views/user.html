@@ -86,6 +86,10 @@
             % for tf in timeframes:
                 <%
                     tf_info = user_info_by_timeframe.get(tf, {})
+                    # 데이터가 없는 경우 건너뛰기
+                    if not tf_info:
+                        continue
+                    end
                     tf_rank = tf_info.get(rank_col, '-')
                     tf_mindshare = tf_info.get(mindshare_col, 0.0)
                 %>

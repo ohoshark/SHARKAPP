@@ -228,6 +228,24 @@ class DataProcessor:
             if not latest_ts: return []
             query = "SELECT username, displayName FROM snaps WHERE timestamp = ? AND timeframe = ?"
             return pd.read_sql(query, conn, params=(latest_ts, timeframe)).to_dict('records')
+    
+    def get_all_usernames_from_multiple_timeframes(self, timeframes=['7D', '14D', '30D', 'TOTAL']):
+        """여러 timeframe에서 사용자를 가져와 중복 제거 후 반환"""
+        all_users = {}
+        with sqlite3.connect(self.db_path) as conn:
+            for tf in timeframes:
+                cursor = conn.cursor()
+                cursor.execute("SELECT MAX(timestamp) FROM snaps WHERE timeframe = ?", (tf,))
+                latest_ts = cursor.fetchone()[0]
+                if not latest_ts:
+                    continue
+                query = "SELECT username, displayName FROM snaps WHERE timestamp = ? AND timeframe = ?"
+                users = pd.read_sql(query, conn, params=(latest_ts, tf)).to_dict('records')
+                for user in users:
+                    # username을 키로 사용하여 중복 제거
+                    if user['username'] not in all_users:
+                        all_users[user['username']] = user
+        return list(all_users.values())
 
     def get_user_info_by_timeframe(self, username, timeframe='TOTAL'):
         with sqlite3.connect(self.db_path) as conn:
