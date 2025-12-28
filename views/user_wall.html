@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<%
+    # i18n 사전 설정
+    i18n = {
+        'ko': {
+            'user_analysis': '사용자 분석',
+            'leaderboard_analysis': '리더보드 분석',
+            'position': '순위',
+            'mindshare': '마인드쉐어',
+            'rank': 'X Score',
+            'score': 'X Score',
+            'chart_title': '순위 및 마인드쉐어 변화 분석',
+            'chart_loading': '차트 데이터 로딩 중...',
+            'search_placeholder': '다른 사용자 검색 (이름 또는 ID)',
+            'close': '닫기',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+            'user_analysis': 'User Analysis',
+            'leaderboard_analysis': 'Leaderboard',
+            'position': 'Rank',
+            'mindshare': 'Mindshare',
+            'rank': 'X Score',
+            'score': 'X Score',
+            'chart_title': 'Rank & Mindshare Analysis',
+            'chart_loading': 'Loading Chart Data...',
+            'search_placeholder': 'Search other users (Name or ID)',
+            'close': 'Close',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
+% include('_head.html')
+<link rel="stylesheet" href="/static/css/user.css">
+<title>{{display_project_name}} {{ user_info.get('name', username) }} {{t['user_analysis']}} - SHARKAPP</title>
+</head>
+<body>
+% include('_navbar.html')
+
+<div class="container mt-4">
+    <!-- 사용자 프로필 카드 -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    % if user_info.get('imageUrl'):
+                        <img src="{{ user_info['imageUrl'] }}" alt="{{ user_info.get('name', username) }}" style="width: 80px; height: 80px; border-radius: 50%;">
+                    % end
+                </div>
+                <div class="col">
+                    <h2 class="mb-1">{{ user_info.get('name', username) }}</h2>
+                    <p class="text-muted mb-2">@{{ username }}</p>
+                    <div class="d-flex gap-4">
+                        <!-- <div>
+                            <small class="text-muted d-block">{{t['rank']}}</small>
+                            <strong>{{ user_info.get('rank', '-') }}</strong>
+                        </div> -->
+                        <div>
+                            <small class="text-muted d-block">{{t['score']}}</small>
+                            <strong>{{ "{:,.0f}".format(user_info.get('score', 0)) if user_info.get('score') else '-' }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 타임프레임별 통계 -->
+    <div class="mb-4">
+        <h4 class="mb-3">{{ t['position'] }} & {{ t['mindshare'] }}</h4>
+        <div class="row g-3">
+            % for tf in timeframes:
+                <%
+                    tf_info = user_info_by_timeframe.get(tf, {})
+                    tf_position = tf_info.get('position', '-')
+                    tf_mindshare = tf_info.get('mindsharePercentage', 0.0)
+                %>
+                <div class="col-6 col-md-3">
+                    <div class="card h-100 text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted fw-bold">{{ tf }}</h6>
+                            <div class="mb-2">
+                                <small class="text-muted d-block">{{ t['position'] }}</small>
+                                <h3 class="mb-0 text-primary">{{ tf_position if tf_position != '-' else '-' }}</h3>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">{{ t['mindshare'] }}</small>
+                                <h4 class="mb-0 text-success">{{ "{:.2f}%".format(tf_mindshare) if tf_mindshare else '-' }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            % end
+        </div>
+    </div>
+
+    % if user_chart:
+    <div class="chart-container" style="margin-top: 0;">
+        <div class="card">
+            <div class="card-header">
+                <h3>{{ t['chart_title'] }}</h3>
+            </div>
+            <div class="card-body chart-relative" id="chartCardBody">
+                <div id="chart-loading-overlay" class="chart-loading-overlay">
+                    {{ t['chart_loading'] }}
+                </div>
+                {{ !user_chart }}
+            </div>
+        </div>
+    </div>
+    % end
+
+    <!-- 사용자 검색창 -->
+    <div class="row mb-4">
+        <div class="col-md-8 search-container">
+            <input type="text" class="form-control" id="userSearchInput" placeholder="{{t['search_placeholder']}}">
+            <div id="searchResults" class="search-dropdown"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 전역 변수 설정
+    window.allUsersData = {{ !all_users }};
+    window.currentProject = "{{project}}";
+    window.currentTimeframe = "{{ timeframe }}";
+    window.isWallchain = true;
+</script>
+<script src="/static/js/user.js"></script>
+
+% include('_footer.html')
+</body>
+</html>

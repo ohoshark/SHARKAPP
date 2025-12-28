@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<%
+    i18n = {
+        'ko': {
+			'pre': '이전',
+			'cur': '현재',
+			'change': '변화',
+			'ms': '마쉐',
+            'title_suffix': '리더보드 변화 분석',
+            'user_analysis': '사용자 분석',
+            'leaderboard_analysis': '리더보드 분석',
+            'data_standard': '데이터 기준',
+            'compare_btn': '비교하기',
+            'prev_point': '이전 시점',
+            'curr_point': '현재 시점',
+			'recent_9hour': '최근 9시간',
+			'Analysis_Result': '분석 결과',
+            'user': '사용자',
+			'pre_rank': '이전 순위',
+			'curr_rank': '현재 순위',
+            'rank_change': '순위 변화',
+			'pre_ms': '이전 마쉐',
+			'curr_ms': '현재 마쉐',
+			'ms_change': '마쉐 변화',
+			'result': '분석 결과',
+            'search_placeholder': '사용자 이름을 입력하세요',
+            'close': '닫기',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+			'pre': 'Pre',
+			'cur': 'Cur',
+			'change': 'Change',
+			'ms': 'MS',
+            'title_suffix': 'Leaderboard Analysis',
+            'user_analysis': 'User Analysis',
+            'leaderboard_analysis': 'Leaderboard',
+            'data_standard': 'Time',
+            'compare_btn': 'COMPARE',
+            'prev_point': 'Prev Point',
+            'curr_point': 'Curr Point',
+			'recent_9hour': 'Recent 9H',
+			'Analysis_Result': 'Analysis Result',
+            'user': 'User',
+			'pre_rank': 'Pre Rank',
+			'curr_rank': 'Cur Rank',
+            'rank_change': 'Rank Change',
+			'pre_ms': 'Pre MS',
+			'curr_ms': 'Cur MS',
+			'ms_change': 'MS Change',
+			'result': 'Analysis Result',
+            'search_placeholder': 'Enter username...',
+            'close': 'Close',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{display_project_name}} {{t['title_suffix']}} - SHARKAPP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+	<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">	
+ 	<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+	<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+	<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+	<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="/static/css/leaderboard.css">
+	<style>
+		/* DataTables 페이징 컨트롤 스타일 통일 */
+		.dataTables_wrapper .dataTables_length select {
+			padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+			border: 1px solid #dee2e6;
+			border-radius: 0.25rem;
+			background-color: #fff;
+			font-size: 1rem;
+			line-height: 1.5;
+			margin-top: 3px;
+		}
+		
+		.dataTables_wrapper .dataTables_length,
+		.dataTables_wrapper .dataTables_paginate {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.5rem 0;
+		}
+		
+		.dataTables_wrapper .dataTables_length {
+			justify-content: flex-start;
+		}
+		
+		.dataTables_wrapper .dataTables_paginate {
+			justify-content: flex-end;
+		}
+		
+		@media (max-width: 767.98px) {
+			.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
+			.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
+			.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
+			.table-responsive td:nth-of-type(4):before { content: "{{t['rank_change']}}"; }
+			.table-responsive td:nth-of-type(5):before { content: "{{t['pre']}} {{t['ms']}}"; }
+			.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{t['ms']}}"; } 
+			.table-responsive td:nth-of-type(7):before { content: "{{t['ms']}} {{t['change']}}"; } 
+			
+			/* 모바일에서 페이징 컨트롤 간격 조정 */
+			.dataTables_wrapper .dataTables_length,
+			.dataTables_wrapper .dataTables_paginate {
+				padding: 0.5rem 0.25rem;
+			}
+		}
+	</style>
+</head>
+
+<body>
+% include('_navbar.html')
+
+    <div class="container mt-4">
+        <div class="card timestamp-selector">
+            <div class="card-header">
+                <h5><b>{{display_project_name.upper()}}</b> {{t['title_suffix']}}</h5>
+            </div>
+			<div class="card-body">
+				<form id="comparisonForm" method="get" action="/wallchain/{{project}}/leaderboard">
+					<div class="row g-3 align-items-end">
+						<div class="col-md-3">
+							<label class="form-label">{{t['data_standard']}}</label>
+							<select name="timeframe" id="timeframe" class="form-select" onchange="updateFilters()">
+								% for tf in timeframes:
+									<option value="{{tf}}" {{'selected' if tf == timeframe else ''}}>{{tf.upper()}}</option>
+								% end
+							</select>
+						</div>
+						<div class="col-12">
+							<div class="d-flex justify-content-between mb-3">
+								<div class="text-start">
+									<strong>{{t['prev_point']}}</strong> 
+									<span id="slider-timestamp1" class="text-muted">{{timestamp1_display}}</span>
+								</div>
+								<div class="text-end">
+									<strong>{{t['curr_point']}}</strong> 
+									<span id="slider-timestamp2" class="text-muted">{{timestamp2_display}}</span>
+								</div>
+							</div>
+							
+							<div id="timeSlider" style="margin: 0 10px;"></div>
+							
+							<input type="hidden" name="timestamp1" id="timestamp1" value="{{timestamp1}}">
+							<input type="hidden" name="timestamp2" id="timestamp2" value="{{timestamp2}}">
+						</div>
+						<div class="d-flex justify-content-end mt-5">
+							<button type="button" class="btn btn-primary me-3" onclick="resetToRecent()">{{t['recent_9hour']}}</button>
+							<button type="submit" class="btn btn-primary px-4">{{t['compare_btn']}}</button>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+        
+        <div class="card comparison-table">
+            <div class="card-header">
+                <h3>
+                    {{t['result']}} 
+                    <small class="text-muted">
+                        ({{ timestamp1_display }} → {{ timestamp2_display }})
+                    </small>
+                </h3>
+            </div>
+			<div class="card-body">
+				<div class="table-responsive">
+					{{ !table_html }}
+				</div>
+			</div>
+        </div>
+    </div>
+
+    <script>
+		// Compressed data - minified for performance
+		const rawTimestamps = {{ !timestamps }};
+		const formattedTimestamps = {{ !formatted_timestamps }};
+
+		const currentTs1 = "{{ timestamp1 }}";
+		const currentTs2 = "{{ timestamp2 }}";
+
+		const timestampMap = {};
+		rawTimestamps.forEach((ts, index) => {
+			timestampMap[ts] = index;
+		});
+
+		document.addEventListener('DOMContentLoaded', function() {
+			const slider = document.getElementById('timeSlider');
+			const input1 = document.getElementById('timestamp1');
+			const input2 = document.getElementById('timestamp2');
+			const display1 = document.getElementById('slider-timestamp1');
+			const display2 = document.getElementById('slider-timestamp2');
+
+			if (rawTimestamps.length >= 2) {
+				const min_index = 0;
+				const max_index = rawTimestamps.length - 1;
+				let start1_index = timestampMap[currentTs1];
+				let start2_index = timestampMap[currentTs2];
+
+				const start1 = (start1_index === undefined) ? rawTimestamps.length - 2 : start1_index;
+				const start2 = (start2_index === undefined) ? rawTimestamps.length - 1 : start2_index;
+
+				noUiSlider.create(slider, {
+					start: [start1, start2], 
+					connect: true,
+					step: 1, 
+					range: {
+						'min': 0,
+						'max': rawTimestamps.length - 1
+					},
+					pips: { 
+						mode: 'count',
+						values: 5,
+						density: 4
+					}
+				});
+
+				slider.noUiSlider.on('update', function (values, handle) {
+					const index1 = Math.round(values[0]);
+					const index2 = Math.round(values[1]);
+					
+					const newTs1 = rawTimestamps[index1];
+					const newTs2 = rawTimestamps[index2];
+					
+					input1.value = newTs1;
+					input2.value = newTs2;
+					
+					display1.textContent = formattedTimestamps[newTs1] || newTs1;
+					display2.textContent = formattedTimestamps[newTs2] || newTs2;
+					
+					const handles = slider.getElementsByClassName('noUi-handle');
+					
+					if (handles[0]) {
+						if (index1 === min_index) {
+							handles[0].classList.add('red-indicator');
+						} else {
+							handles[0].classList.remove('red-indicator');
+						}
+					}
+				
+					if (handles[1]) {
+						if (index2 === max_index) {
+							handles[1].classList.add('red-indicator');
+						} else {
+							handles[1].classList.remove('red-indicator');
+						}
+					}
+				});
+			} else {
+				document.getElementById('timeSlider').innerHTML = '<p class="text-warning">비교 가능한 타임스탬프 데이터가 부족합니다.</p>';
+			}
+			
+			document.getElementById('comparisonForm').addEventListener('submit', function(e) {
+				if (input1.value === input2.value) {
+					e.preventDefault();
+					alert('비교를 위해 서로 다른 시간대를 선택해주세요.');
+					return false;
+				}
+			});
+		});
+    </script>
+	<script>
+		$.fn.dataTable.ext.type.order['special-num-pre'] = function ( data ) {
+			let num = data.replace(/[↑↓,-]/g, ''); 
+			if (num === '') {
+				return 0;
+			}
+			return parseFloat(num);
+		};
+
+		$(document).ready(function() {
+			const $tableElement = $('#leaderboardTable');
+			let table = null;
+			
+			if ($tableElement.length > 0) {
+				table = $tableElement.DataTable({
+					"dom": "<'row'<'col-6 col-md-6'l><'col-6 col-md-6'p>>" +
+						   "<'row'<'col-sm-12'tr>>" +
+						   "<'row'<'col-sm-12 text-center'i>>",
+					"paging": true,
+					"pageLength": 300,
+					"lengthMenu": [[100, 300, 500, -1], [100, 300, 500, "All"]],
+					"info": true,
+					"ordering": true,
+					"searching": false,
+					"language": {
+						"emptyTable": "비교할 데이터가 없습니다.",
+						"zeroRecords": "일치하는 데이터가 없습니다.",
+						"info": "",
+						"infoEmpty": "0개 항목",
+						"lengthMenu": "_MENU_",
+						"paginate": {
+							"first": "<<",
+							"last": ">>",
+							"next": ">",
+							"previous": "<"
+						}
+					},
+					"order": [[2, 'asc']], 
+					"columnDefs": [
+						{ "orderable": false, "targets": 0 },
+						{ "orderable": true, "targets": "_all" }
+					]
+				});
+				
+				$('.dataTables_wrapper').addClass('no-footer');
+
+				let currentSortColumn = 2; 
+				let currentSortDirection = 'desc'; 
+
+				const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
+				const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
+				if (defaultSortOption.length) {
+					defaultSortOption.text(defaultSortOption.text() + initialIndicator);
+				}
+				$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt');
+				
+				$('.sort-option').on('click', function(e) {
+					e.preventDefault();
+					
+					if (!table) {
+						console.warn('Table not initialized');
+						return;
+					}
+					
+					const requestedColumn = parseInt($(this).data('column'));
+					const defaultDirection = $(this).data('default-dir') || 'desc'; 
+					let newDirection;
+
+					if (requestedColumn === currentSortColumn) {
+						newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
+					} else {
+						newDirection = defaultDirection;
+					}
+
+					$('.sort-option').each(function() {
+						let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
+						$(this).text(text);
+					});
+
+					table.order([requestedColumn, newDirection]).draw();
+
+					currentSortColumn = requestedColumn;
+					currentSortDirection = newDirection;
+
+					const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
+					const currentText = $(this).text();
+					$(this).text(currentText + indicator);
+
+					const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
+					$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
+				});
+			} else {
+				console.warn('Leaderboard table not found - FAB sort will not work');
+			}
+			
+			// User search functionality
+			const $usernameInput = $('#usernameInput');
+			const $searchResults = $('#searchResults');
+			const searchModalElement = document.getElementById('searchModal');
+			const searchModal = new bootstrap.Modal(searchModalElement);
+				
+			function searchUsers(query) {
+				$searchResults.empty();
+				if (query.length < 2) { 
+					$searchResults.append('<div class="list-group-item">최소 2글자 이상 입력해주세요.</div>');
+					return;
+				}
+
+				const lowerQuery = query.toLowerCase();
+				const foundUsers = [];
+				
+				table.rows().every(function() { 
+					const rowData = this.data();
+					const username = $('<div>' + rowData[0] + '</div>').text().trim(); 
+					
+					if (username.toLowerCase().includes(lowerQuery)) {
+						foundUsers.push({
+							username: username,
+							index: this.index()
+						});
+					}
+				});
+
+				if (foundUsers.length === 0) {
+					$searchResults.append('<div class="list-group-item list-group-item-warning">일치하는 사용자가 없습니다.</div>');
+					return;
+				}
+
+				foundUsers.forEach(function(user) {
+					const $item = $(
+						'<a href="#" class="list-group-item list-group-item-action" ' +
+						'data-username="' + user.username + '">' + 
+						user.username + '</a>'
+					);
+					$searchResults.append($item);
+				});
+			}
+
+			let searchTimer;
+			$usernameInput.on('keyup', function() {
+				clearTimeout(searchTimer);
+				const query = $usernameInput.val().trim();
+				searchTimer = setTimeout(function() {
+					searchUsers(query);
+				}, 300);
+			});
+
+			$searchResults.on('click', 'a.list-group-item-action', function(e) {
+				e.preventDefault();
+				const usernameToFind = $(this).data('username');
+				let targetRowIndex = null;
+
+				// 전체 행에서 해당 사용자 찾기
+				table.rows().every(function() {
+					const rowData = this.data();
+					const cellText = $('<div>' + rowData[0] + '</div>').text().trim(); 
+					if (cellText === usernameToFind) {
+						targetRowIndex = this.index();
+						return false; 
+					}
+				});
+
+				if (targetRowIndex !== null) {
+					searchModal.hide();
+					
+					setTimeout(function() {
+						$('.modal-backdrop').remove();
+						$('body').removeClass('modal-open');
+						$('body').css({'overflow': 'auto', 'padding-right': ''});
+					}, 100);
+					
+					setTimeout(function() {
+						// 해당 행이 있는 페이지로 이동
+						const pageInfo = table.page.info();
+						const pageSize = pageInfo.length;
+						const targetPage = Math.floor(targetRowIndex / pageSize);
+						
+						// 페이지 이동 (false = 페이지 번호 리셋 안 함)
+						table.page(targetPage).draw(false);
+						
+						// 페이지 이동 후 DOM이 업데이트되면 스크롤
+						setTimeout(function() {
+							const $targetRow = $(table.row(targetRowIndex).node());
+							
+							if ($targetRow && $targetRow.length) {
+								$('html, body').animate({
+									scrollTop: $targetRow.offset().top - 150 
+								}, 500);
+
+								$targetRow.addClass('table-warning');
+								setTimeout(function() {
+									$targetRow.removeClass('table-warning');
+								}, 2000);
+							}
+						}, 100);
+					}, 300);
+				}
+			});
+
+			searchModalElement.addEventListener('shown.bs.modal', function () {
+				$usernameInput.focus();
+			});
+			twemoji.parse(document.body);
+		});
+	</script>
+
+<div class="fixed-bottom d-flex flex-column align-items-end p-4" style="z-index: 1050; left:auto;">
+    <div class="dropdown dropup mb-3">
+        <button class="btn btn-primary btn-lg rounded-circle shadow-lg fab-custom-size" 
+                type="button" 
+                id="fabSortDropdown" 
+                data-bs-toggle="dropdown" 
+                data-bs-auto-close="true"
+                aria-expanded="false"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-sort-amount-down-alt"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown" style="z-index: 1051; position: absolute; bottom: 100%; margin-bottom: 0.5rem;">
+            <li class="dropdown-header">정렬 기준 선택</li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="asc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="asc">{{t['curr_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">{{t['rank_change']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">{{t['pre']}} {{t['ms']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">{{t['cur']}} {{t['ms']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{t['ms']}} {{t['change']}}</a></li>
+        </ul>
+    </div>
+    
+    <div class="d-flex align-items-center">
+		<button class="btn btn-secondary btn-lg rounded-circle shadow-lg me-3 fab-custom-size" 
+				type="button" 
+				id="fabScrollTop" 
+				style="background-color: #6c757d !important; border-color: #6c757d !important; display: none;"> 
+			<i class="fas fa-arrow-up"></i>
+		</button>
+        
+        <button class="btn btn-info btn-lg rounded-circle shadow-lg fab-custom-size" 
+                type="button" 
+                data-bs-toggle="modal" 
+                data-bs-target="#searchModal"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-search"></i>
+        </button> 
+    </div>
+</div>
+
+% include('_footer.html')
+<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{t['user_analysis']}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">{{t['user']}}:</label>
+                    <input type="text" class="form-control" id="usernameInput" placeholder="{{t['search_placeholder']}}" autocomplete="off">
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{t['close']}}</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+	const scrollTopButton = document.getElementById('fabScrollTop');
+	const scrollThreshold = 300; 
+
+	window.addEventListener('scroll', function() {
+		if (window.scrollY > scrollThreshold) {
+			scrollTopButton.style.display = 'flex';
+		} else {
+			scrollTopButton.style.display = 'none';
+		}
+	});
+
+	scrollTopButton.addEventListener('click', function(e) {
+		e.preventDefault();
+		$('html, body').animate({
+			scrollTop: 0
+		}, 500); 
+	});
+	
+	function updateFilters() {
+		// 1. 현재 선택된 timeframe만 가져옴
+		const tf = document.getElementById('timeframe').value;
+		
+		// 2. 프로젝트 경로
+		const project = "{{project}}";
+		
+		// 3. timestamp를 제외한 순수 timeframe만 쿼리 스트링으로 구성
+		// window.location.pathname을 사용하여 현재 주소 뒤의 파라미터를 초기화함
+		window.location.href = window.location.pathname + "?timeframe=" + tf;
+	}
+
+	function resetToRecent() {
+		// updateFilters를 재사용하여 timestamp를 초기화
+		updateFilters();
+	}
+</script>
+<script>
+  $(document).ready(function() {
+    twemoji.parse(document.body);
+  });
+</script>
+
+</body>
+</html>

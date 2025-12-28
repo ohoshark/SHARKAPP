@@ -7,7 +7,7 @@
             <div class="dropdown">
                 <button class="project-switcher dropdown-toggle text-dark" type="button" id="projectDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                     <% 
-                        flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                        flags = {'ko': '🇰🇷', 'en': '🌐','global': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
                         current_parts = project.rsplit('-', 1)
                         current_name = current_parts[0].upper()
                         current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
@@ -15,19 +15,98 @@
                     %>
                     {{current_flag}} {{current_name}}
                 </button>
-                <ul class="dropdown-menu shadow border-0" style="padding: 5px;" aria-labelledby="projectDropdown">
-                    % for p in all_projects:
-                        <% 
-                            p_parts = p.rsplit('-', 1)
-                            p_name = p_parts[0].upper()
-                            p_lang = p_parts[1].lower() if len(p_parts) > 1 else ''
-                            p_flag = flags.get(p_lang, '')
-                        %>
+                <ul class="dropdown-menu shadow border-0" style="padding: 5px; background-color: rgba(255,255,255,0.6); backdrop-filter: blur(6px);" aria-labelledby="projectDropdown">
+                    % if grouped_wallchain:
                         <li>
-                            <a class="dropdown-item {{'active' if p == project else ''}}" href="/{{p}}/leaderboard">
-                                {{p_flag}} {{p_name}}
+                            <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
+                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🌊 Wallchain Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
+                        <div class="collapse" id="wallchainProjectsCollapse">
+                        % for proj_name in sorted(grouped_wallchain.keys()):
+                            <% items = grouped_wallchain[proj_name] %>
+                            % if len(items) == 1:
+                                <% 
+                                    item = items[0]
+                                    flags_map = {'ko': '🇰🇷', 'en': '🌐','global': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                                    p_flag = flags_map.get(item['lang'].lower(), '')
+                                %>
+                                <li>
+                                    <a class="dropdown-item" href="/wallchain/{{item['full']}}/leaderboard">
+                                        {{p_flag}} {{proj_name.upper()}}
+                                    </a>
+                                </li>
+                            % else:
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center" style="font-weight: 600; cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wall-{{proj_name}}" aria-expanded="false" onclick="event.stopPropagation();">
+                                        {{proj_name.upper()}}
+                                        <i class="fas fa-chevron-down" style="font-size: 0.8rem;"></i>
+                                    </a>
+                                    <div class="collapse" id="wall-{{proj_name}}">
+                                        % for item in sorted(items, key=lambda x: x['lang']):
+                                            <% 
+                                                flags_map = {'ko': '🇰🇷', 'en': '🌐','global': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                                                lang_names = {'en': 'GLOBAL', 'global': 'GLOBAL', 'es': 'Spanish', 'pt': 'Portuguese', 'zh': 'Chinese', 'ko': 'Korean'}
+                                                p_flag = flags_map.get(item['lang'].lower(), '')
+                                                lang_display = lang_names.get(item['lang'].lower(), item['lang'].upper())
+                                            %>
+                                            <a class="dropdown-item" style="padding-left: 2.5rem;" href="/wallchain/{{item['full']}}/leaderboard">
+                                                {{p_flag}} {{lang_display}}
+                                            </a>
+                                        % end
+                                    </div>
+                                </li>
+                            % end
+                        % end
+                        </div>
+                    % end
+                    
+                    % if grouped_projects:
+                        % if grouped_wallchain:
+                            <li><hr class="dropdown-divider"></li>
+                        % end
+                        <li>
+                            <a class="dropdown-header text-primary fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cookieProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
+                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🍪 Cookie Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                            </a>
+                        </li>
+                        <div class="collapse" id="cookieProjectsCollapse">
+                        % for proj_name in sorted(grouped_projects.keys()):
+                            <% items = grouped_projects[proj_name] %>
+                            % if len(items) == 1:
+                                <% 
+                                    item = items[0]
+                                    flags_map = {'ko': '🇰🇷', 'en': '🌐','global': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                                    p_flag = flags_map.get(item['lang'].lower(), '')
+                                %>
+                                <li>
+                                    <a class="dropdown-item" href="/{{item['full']}}/leaderboard">
+                                        {{p_flag}} {{proj_name.upper()}}
+                                    </a>
+                                </li>
+                            % else:
+                                <li>
+                                    <a class="dropdown-item d-flex justify-content-between align-items-center" style="font-weight: 600; cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cookie-{{proj_name}}" aria-expanded="false" onclick="event.stopPropagation();">
+                                        {{proj_name.upper()}}
+                                        <i class="fas fa-chevron-down" style="font-size: 0.8rem;"></i>
+                                    </a>
+                                    <div class="collapse" id="cookie-{{proj_name}}">
+                                        % for item in sorted(items, key=lambda x: x['lang']):
+                                            <% 
+                                                flags_map = {'ko': '🇰🇷', 'en': '🌐','global': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'}
+                                                lang_names = {'en': 'GLOBAL', 'global': 'GLOBAL', 'es': 'Spanish', 'pt': 'Portuguese', 'zh': 'Chinese', 'ko': 'Korean'}
+                                                p_flag = flags_map.get(item['lang'].lower(), '')
+                                                lang_display = lang_names.get(item['lang'].lower(), item['lang'].upper())
+                                            %>
+                                            <a class="dropdown-item" style="padding-left: 2.5rem;" href="/{{item['full']}}/leaderboard">
+                                                {{p_flag}} {{lang_display}}
+                                            </a>
+                                        % end
+                                    </div>
+                                </li>
+                            % end
+                        % end
+                        </div>
                     % end
                 </ul>
             </div>
@@ -38,20 +117,25 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-lg-4 me-auto">
+            <ul class="navbar-nav ms-auto ms-lg-4 me-lg-auto text-end text-lg-start">
+                <%
+                    # 현재 페이지가 wallchain인지 확인
+                    is_wallchain = get('is_wallchain', False)
+                    base_url = f"/wallchain/{project}" if is_wallchain else f"/{project}"
+                %>
                 <li class="nav-item">
-                    <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="/{{project}}/">{{t['user_analysis']}}</a>
+                    <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="{{base_url}}/">{{t['user_analysis']}}</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="/{{project}}/leaderboard">{{t['leaderboard_analysis']}}</a>
+                    <a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="{{base_url}}/leaderboard">{{t['leaderboard_analysis']}}</a>
                 </li>
             </ul>
                     
-            <div class="creator-badge me-2" data-bs-toggle="modal" data-bs-target="#creatorModal">
+            <div class="creator-badge me-2 text-end text-lg-start" data-bs-toggle="modal" data-bs-target="#creatorModal">
                 <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
                 <span>Created by ohoshark</span>
             </div>
-            <div class="btn-group btn-group-sm me-3">
+            <div class="btn-group btn-group-sm me-3 d-flex justify-content-end justify-content-lg-start">
                 <a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
                 <a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
             </div>
