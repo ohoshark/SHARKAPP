@@ -31,18 +31,20 @@ CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 
 def get_cached_projects():
     current_time = time.time()
+    
+    # 프로젝트가 등록되지 않았다면 실시간으로 반환
+    if not project_instances:
+        return []
+    
     # 마지막 업데이트로부터 5분이 지나지 않았으면 저장된 리스트 반환
     if PROJECT_CACHE["list"] and (current_time - PROJECT_CACHE["last_updated"] < CACHE_INTERVAL):
         return PROJECT_CACHE["list"]
     
     # 5분이 지났거나 리스트가 없으면 새로 스캔
-    data_dir = 'data'
-    if os.path.exists(data_dir):
-        projects = sorted(project_instances.keys())
-        PROJECT_CACHE["list"] = projects
-        PROJECT_CACHE["last_updated"] = current_time
-        return projects
-    return []
+    projects = sorted(project_instances.keys())
+    PROJECT_CACHE["list"] = projects
+    PROJECT_CACHE["last_updated"] = current_time
+    return projects
 def log_access(route_name, project_name, username=None):
     """
     접속 정보를 로그 파일에 기록합니다.
