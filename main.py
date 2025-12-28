@@ -951,7 +951,7 @@ def project_compare_users(projectname):
 @app.route('/wallchain/<projectname>')
 @app.route('/wallchain/<projectname>/')
 def wallchain_index(projectname):
-    log_access('wallchain_search', projectname)
+    log_access('user_search_wall', projectname)
     lang = get_language()
     
     full_project_name = f"wallchain-{projectname}"
@@ -1056,15 +1056,22 @@ def wallchain_leaderboard(projectname):
         
         if num_ts > 0:
             if not timestamp1 or timestamp1 not in timestamps:
-                if num_ts >= 2:
-                    timestamp1 = timestamps[-2]
-                else:
-                    timestamp1 = timestamps[-1]
+                # 2. -9 인덱스를 시도하되, 데이터가 부족하면 0번(최초 데이터)을 선택
+                # max(0, num_ts - 9)를 사용하면 데이터가 5개뿐일 때 -4가 아닌 0번 인덱스를 잡습니다.
+                try:
+                    # 원래 의도하신 -9 인덱스 시도
+                    timestamp1 = timestamps[-10]
+                except IndexError:
+                    # -9가 없을 경우, 리스트의 가장 첫 번째([0]) 데이터를 선택 (최대 가용 범위)
+                    timestamp1 = timestamps[0]
                     
             if not timestamp2 or timestamp2 not in timestamps:
+                # timestamp2는 리스트의 가장 마지막(최신) 값으로 설정
                 timestamp2 = timestamps[-1]
         else:
             timestamp1 = timestamp2 = ''
+        if not timestamp2 or timestamp2 not in timestamps:
+            timestamp2 = timestamps[-1] if timestamps else ''
             
         compare_data = pd.DataFrame()
         
