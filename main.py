@@ -425,6 +425,8 @@ def home_redirect(projectname):
 # 동적 프로젝트 라우팅
 @app.route('/<projectname>')
 @app.route('/<projectname>/')
+@app.route('/cookie/<projectname>')
+@app.route('/cookie/<projectname>/')
 def project_index(projectname):
     log_access('user_search', projectname)
     # 🚨 [필수 추가] /favicon.ico 요청이 실수로 앱에 도달했을 때 404 반환
@@ -467,6 +469,7 @@ def project_index(projectname):
         return render_error(str(e), projectname)
 
 @app.route('/<projectname>/leaderboard')
+@app.route('/cookie/<projectname>/leaderboard')
 def project_leaderboard(projectname):
     log_access('project_leaderboard', projectname)
     lang = get_language()  # 현재 설정된 언어 가져오기
@@ -668,6 +671,7 @@ def project_leaderboard(projectname):
 
 # 사용자 상세 분석 페이지
 @app.route('/<projectname>/user/<username>')
+@app.route('/cookie/<projectname>/user/<username>')
 def project_user_analysis(projectname,username):
     log_access('user', projectname, username)
     lang = get_language()  # 현재 설정된 언어 가져오기

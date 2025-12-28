@@ -19,7 +19,7 @@
                     % if grouped_wallchain:
                         <li>
                             <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🌊 Wallchain Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🦆 Wallchain Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="wallchainProjectsCollapse">
@@ -80,7 +80,7 @@
                                     p_flag = flags_map.get(item['lang'].lower(), '')
                                 %>
                                 <li>
-                                    <a class="dropdown-item" href="/{{item['full']}}/leaderboard">
+                                    <a class="dropdown-item" href="/cookie/{{item['full']}}/leaderboard">
                                         {{p_flag}} {{proj_name.upper()}}
                                     </a>
                                 </li>
@@ -98,7 +98,7 @@
                                                 p_flag = flags_map.get(item['lang'].lower(), '')
                                                 lang_display = lang_names.get(item['lang'].lower(), item['lang'].upper())
                                             %>
-                                            <a class="dropdown-item" style="padding-left: 2.5rem;" href="/{{item['full']}}/leaderboard">
+                                            <a class="dropdown-item" style="padding-left: 2.5rem;" href="/cookie/{{item['full']}}/leaderboard">
                                                 {{p_flag}} {{lang_display}}
                                             </a>
                                         % end
@@ -121,7 +121,7 @@
                 <%
                     # 현재 페이지가 wallchain인지 확인
                     is_wallchain = get('is_wallchain', False)
-                    base_url = f"/wallchain/{project}" if is_wallchain else f"/{project}"
+                    base_url = f"/wallchain/{project}" if is_wallchain else f"/cookie/{project}"
                 %>
                 <li class="nav-item">
                     <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="{{base_url}}/">{{t['user_analysis']}}</a>
