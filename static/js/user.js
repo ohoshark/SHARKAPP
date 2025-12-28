@@ -50,7 +50,7 @@ $(document).ready(function() {
                         if (isWallchain) {
                             window.location.href = `/wallchain/${window.currentProject}/user/${user.username}?timeframe=${currentTimeframe}`;
                         } else {
-                            window.location.href = `/${window.currentProject}/user/${user.username}?timeframe=${currentTimeframe}&metric=${currentMetric}`;
+                            window.location.href = `/cookie/${window.currentProject}/user/${user.username}?timeframe=${currentTimeframe}&metric=${currentMetric}`;
                         }
                     });
                     searchResults.appendChild(item);
