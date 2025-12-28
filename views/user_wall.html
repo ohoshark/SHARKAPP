@@ -52,8 +52,8 @@
                     % end
                 </div>
                 <div class="col">
-                    <h2 class="mb-1">{{ user_info.get('name', username) }}</h2>
-                    <p class="text-muted mb-2">@{{ username }}</p>
+                    <h2 class="mb-1"><a href="https://x.com/{{username}}" class="user-link" target="_blank">{{ user_info.get('name', username) }}</a></h2>
+                    <p class="text-muted mb-2"><a href="https://x.com/{{username}}" class="user-link" target="_blank">@{{ username }}</a></p>
                     <div class="d-flex gap-4">
                         <!-- <div>
                             <small class="text-muted d-block">{{t['rank']}}</small>
