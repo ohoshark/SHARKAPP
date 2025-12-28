@@ -256,15 +256,18 @@ class DataProcessor:
         return {tf: self.get_user_history(username, tf) for tf in self.timeframes}
 
     def compare_leaderboards(self, timestamp1, timestamp2, timeframe='TOTAL', metric='snapsPercent'):
+        # 1. 컬럼 설정
         if metric == 'snapsPercent':
             rank_col, ms_col, diff_col = 'rank', 'snapsPercent', 'mindshare_change'
         else:
             rank_col, ms_col, diff_col = 'cSnapsPercentRank', 'cSnapsPercent', 'c_mindshare_change'
             
+        # 2. 데이터 가져오기
         df1 = self.get_leaderboard_at_timestamp(timestamp1, timeframe)
         df2 = self.get_leaderboard_at_timestamp(timestamp2, timeframe)
         if df1.empty and df2.empty: return pd.DataFrame()
 
+        # 3. 데이터 전처리 (이름 변경)
         df1 = df1[['username', 'displayName', rank_col, ms_col, 'profileImageUrl']].rename(columns={
             rank_col: 'prev_rank', ms_col: 'prev_mindshare', 'profileImageUrl': 'prev_profileImageUrl'
         })
@@ -272,20 +275,39 @@ class DataProcessor:
             rank_col: 'curr_rank', ms_col: 'curr_mindshare', 'profileImageUrl': 'curr_profileImageUrl'
         })
         
+        # 4. 병합 및 결측치 채우기
         compare_data = pd.merge(df1, df2, on='username', how='outer', suffixes=('_prev', '_curr'))
         compare_data['displayName'] = compare_data['displayName_curr'].combine_first(compare_data['displayName_prev']).fillna('')
         compare_data['profileImageUrl'] = compare_data['curr_profileImageUrl'].combine_first(compare_data['prev_profileImageUrl']).fillna('')
+        
+        # 여기서 999와 0으로 채움
         compare_data.fillna({'prev_mindshare': 0, 'curr_mindshare': 0, 'prev_rank': 999, 'curr_rank': 999}, inplace=True)
         
+        # 5. 변동폭 계산
         compare_data['rank_change'] = compare_data['prev_rank'] - compare_data['curr_rank']
         compare_data[diff_col] = compare_data['curr_mindshare'] - compare_data['prev_mindshare']
+        
+        # --- [수정된 부분] 보정 로직 시작 ---
+        
+        # (1) 순위 변동 보정: 500등 이상 차이나면(진입/이탈) 순위 변동 0 처리
         compare_data['rank_change'] = np.where(abs(compare_data['rank_change']) > 500, 0, compare_data['rank_change'])
 
+        # (2) 마인드쉐어 변동 보정: 이전이나 현재 순위 중 하나라도 999(순위 밖)면 마인드쉐어 변동 0 처리
+        compare_data[diff_col] = np.where(
+            (compare_data['prev_rank'] == 999) | (compare_data['curr_rank'] == 999), 
+            0, 
+            compare_data[diff_col]
+        )
+        
+        # --- [수정된 부분] 보정 로직 끝 ---
+
+        # 6. 결과 정리
         result = compare_data[['username', 'displayName', 'profileImageUrl', 'prev_rank', 'curr_rank', 'rank_change', 
                               'prev_mindshare', 'curr_mindshare', diff_col]].copy()
         
         if metric == 'cSnapsPercent':
              result.rename(columns={'prev_mindshare': 'prev_c_mindshare', 'curr_mindshare': 'curr_c_mindshare'}, inplace=True)
+        
         result.sort_values('rank_change', ascending=False, inplace=True)
         return result
 

@@ -306,27 +306,38 @@ class DataProcessorWallchain:
         compare_data['name'] = compare_data['name_curr'].fillna(compare_data['name_prev']).fillna('')
         compare_data['imageUrl'] = compare_data['curr_imageUrl'].fillna(compare_data['prev_imageUrl']).fillna('')
         
-        # 결측값 처리
+        # 결측값 처리 (순위 밖은 9999로 설정)
         compare_data['prev_mindshare'] = compare_data['prev_mindshare'].fillna(0)
         compare_data['curr_mindshare'] = compare_data['curr_mindshare'].fillna(0)
-        compare_data['prev_position'] = compare_data['prev_position'].fillna(999)
-        compare_data['curr_position'] = compare_data['curr_position'].fillna(999)
+        compare_data['prev_position'] = compare_data['prev_position'].fillna(9999)
+        compare_data['curr_position'] = compare_data['curr_position'].fillna(9999)
         
-        # 순위 변화 계산
+        # 순위 변화 및 마인드쉐어 변화 기본 계산
         compare_data['position_change'] = compare_data['prev_position'] - compare_data['curr_position']
         compare_data['mindshare_change'] = compare_data['curr_mindshare'] - compare_data['prev_mindshare']
         
-        # 비정상적인 순위 변화 처리 (새로 진입하거나 탈락한 유저)
+        # --- [보정 로직 시작] ---
+        
+        # 1. 비정상적인 순위 변화 처리 (500위 이상 변동 시 0 처리)
         compare_data['position_change'] = np.where(
             abs(compare_data['position_change']) > 500, 
             0, 
             compare_data['position_change']
         )
 
-        result = compare_data[['username', 'name', 'imageUrl', 'prev_position', 'curr_position', 'position_change', 
-                              'prev_mindshare', 'curr_mindshare', 'mindshare_change']].copy()
+        # 2. [추가됨] 마인드쉐어 변동 보정 (순위 밖(9999)에서 들어오거나 나갈 때 0 처리)
+        compare_data['mindshare_change'] = np.where(
+            (compare_data['prev_position'] == 9999) | (compare_data['curr_position'] == 9999),
+            0,
+            compare_data['mindshare_change']
+        )
         
-        # 현재 순위 기준으로 정렬 (999는 맨 뒤로)
+        # --- [보정 로직 끝] ---
+
+        result = compare_data[['username', 'name', 'imageUrl', 'prev_position', 'curr_position', 'position_change', 
+                               'prev_mindshare', 'curr_mindshare', 'mindshare_change']].copy()
+        
+        # 현재 순위 기준으로 정렬 (9999는 맨 뒤로)
         result.sort_values(['curr_position', 'prev_position'], ascending=[True, True], inplace=True)
         return result
 
