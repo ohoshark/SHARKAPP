@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from data_processor import DataProcessor
 from data_processor_wallchain import DataProcessorWallchain
-from unified_data_manager import UnifiedDataManager
+from global_data_manager import GlobalDataManager
 import schedule
 
 app = Bottle()
@@ -31,8 +31,8 @@ wallchain_instances = {}  # Wallchain 프로젝트
 # main.py 파일 상단에 로그 파일 경로 설정
 LOG_FILE = 'access_log.txt'
 
-# 통합 데이터 관리자 초기화
-unified_manager = UnifiedDataManager()
+# 글로벌 데이터 관리자 초기화
+global_manager = GlobalDataManager()
 
 # main.py 파일 내 log_access 함수를 아래와 같이 수정
 PROJECT_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
@@ -357,17 +357,17 @@ def favicon():
     # print("--- DEBUG: Favicon 라우트 호출됨 ---")
     return static_file('favicon.ico', root='./static')
 
-# ===================== UNIFIED DATA MANAGEMENT =====================
+# ===================== GLOBAL DATA MANAGEMENT =====================
 
-def update_unified_rankings():
-    """통합 DB 갱신 - 모든 프로젝트의 최신 순위 정보 수집"""
+def update_global_rankings():
+    """글로벌 DB 갱신 - 모든 프로젝트의 최신 순위 정보 수집"""
     print(f"\n{'='*60}")
-    print(f"[통합 DB 갱신 시작] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[글로벌 DB 갱신 시작] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}")
     
     try:
         # 배치 업데이트 시작 (임시 테이블 생성)
-        unified_manager.begin_batch_update()
+        global_manager.begin_batch_update()
         
         # 메모리에 데이터 수집
         users_batch = {}  # {infoName: (infoName, displayName, imageUrl, wal_score)}
@@ -477,15 +477,15 @@ def update_unified_rankings():
                 print(f"[Wallchain] {project_name} 오류: {e}")
         
         # 배치 삽입
-        print(f"[통합 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
-        unified_manager.batch_insert_users(list(users_batch.values()))
-        unified_manager.batch_insert_rankings(rankings_batch)
+        print(f"[글로벌 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
+        global_manager.batch_insert_users(list(users_batch.values()))
+        global_manager.batch_insert_rankings(rankings_batch)
         
         # 원자적 교체
-        unified_manager.commit_batch_update()
+        global_manager.commit_batch_update()
         
         # 갱신되지 않은 row의 ms, cms를 0으로 설정 (OUT OF RANK 처리)
-        print("[통합 DB] OUT OF RANK 유저 처리 중...")
+        print("[글로벌 DB] OUT OF RANK 유저 처리 중...")
         try:
             # 이번에 수집된 (infoName, projectName, timeframe) 조합
             collected_keys = set()
@@ -494,7 +494,7 @@ def update_unified_rankings():
                 collected_keys.add((infoName, projectName, timeframe))
             
             # DB에서 갱신되지 않은 row 찾아서 ms, cms를 0으로
-            with sqlite3.connect('./data/unified_rankings.db') as conn:
+            with sqlite3.connect('./data/global_rankings.db') as conn:
                 cursor = conn.cursor()
                 
                 # 모든 rankings의 key 가져오기
@@ -514,59 +514,59 @@ def update_unified_rankings():
                         out_of_rank_count += 1
                 
                 conn.commit()
-                print(f"[통합 DB] OUT OF RANK 처리 완료: {out_of_rank_count}건")
+                print(f"[글로벌 DB] OUT OF RANK 처리 완료: {out_of_rank_count}건")
         except Exception as e:
-            print(f"[통합 DB] OUT OF RANK 처리 오류: {e}")
+            print(f"[글로벌 DB] OUT OF RANK 처리 오류: {e}")
         
         print(f"\n{'='*60}")
-        print(f"[통합 DB 갱신 완료] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"[글로벌 DB 갱신 완료] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*60}\n")
         
     except Exception as e:
-        print(f"[통합 DB 갱신 실패] {e}")
+        print(f"[글로벌 DB 갱신 실패] {e}")
         import traceback
         traceback.print_exc()
 
-def schedule_unified_updates():
-    """매 시간 15분에 통합 DB 갱신 스케줄링"""
-    schedule.every().hour.at(":15").do(update_unified_rankings)
+def schedule_global_updates():
+    """매 시간 15분에 글로벌 DB 갱신 스케줄링"""
+    schedule.every().hour.at(":15").do(update_global_rankings)
     
     # DB가 비어있으면 즉시 갱신, 아니면 5분 후 갱신
     def initial_update():
         try:
             # 프로젝트 초기화가 완료될 때까지 대기 (최대 60초)
-            print("[통합 DB] 프로젝트 초기화 대기 중...")
+            print("[글로벌 DB] 프로젝트 초기화 대기 중...")
             wait_time = 0
             while (not project_instances or not wallchain_instances) and wait_time < 60:
                 time.sleep(1)
                 wait_time += 1
             
             if not project_instances and not wallchain_instances:
-                print("[통합 DB] 경고: 프로젝트가 초기화되지 않았습니다.")
+                print("[글로벌 DB] 경고: 프로젝트가 초기화되지 않았습니다.")
                 return
             
-            print(f"[통합 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}")
+            print(f"[글로벌 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}")
             
             # 데이터베이스에 데이터가 있는지 확인
-            conn = sqlite3.connect('./data/unified_rankings.db')
+            conn = sqlite3.connect('./data/global_rankings.db')
             cursor = conn.cursor()
             cursor.execute('SELECT COUNT(*) FROM users')
             count = cursor.fetchone()[0]
             conn.close()
             
             if count == 0:
-                print("[통합 DB] 데이터가 없음 - 즉시 갱신 시작")
-                update_unified_rankings()
+                print("[글로벌 DB] 데이터가 없음 - 즉시 갱신 시작")
+                update_global_rankings()
             else:
-                print(f"[통합 DB] 기존 데이터 {count}개 확인 - 5분 후 갱신 예정")
+                print(f"[글로벌 DB] 기존 데이터 {count}개 확인 - 5분 후 갱신 예정")
                 time.sleep(300)  # 5분 대기
-                update_unified_rankings()
+                update_global_rankings()
         except Exception as e:
-            print(f"[통합 DB 초기화 오류] {e}")
+            print(f"[글로벌 DB 초기화 오류] {e}")
             # 오류 발생 시에도 프로젝트가 있으면 갱신 시도
             if project_instances or wallchain_instances:
-                print("[통합 DB] 오류 발생했지만 갱신 시도...")
-                update_unified_rankings()
+                print("[글로벌 DB] 오류 발생했지만 갱신 시도...")
+                update_global_rankings()
     
     threading.Thread(target=initial_update, daemon=True).start()
     
@@ -577,7 +577,7 @@ def schedule_unified_updates():
             time.sleep(30)
     
     threading.Thread(target=run_scheduler, daemon=True).start()
-    print("[통합 DB 스케줄러] 매 시간 15분 갱신으로 설정됨")
+    print("[글로벌 DB 스케줄러] 매 시간 15분 갱신으로 설정됨")
 
 @app.route('/ref')
 @app.route('/')
@@ -630,12 +630,12 @@ def get_language():
     """
     return request.get_cookie('lang', 'ko')
 
-# ===================== UNIFIED SEARCH ROUTES =====================
+# ===================== GLOBAL SEARCH ROUTES =====================
 
 @app.route('/user-lookup')
 def user_lookup_page():
-    """통합 검색 페이지"""
-    log_access('user_lookup', 'unified_search')
+    """글로벌 검색 페이지"""
+    log_access('user_lookup', 'global_search')
     lang = get_language()
     
     all_projects = get_cached_projects()
@@ -643,7 +643,7 @@ def user_lookup_page():
     grouped_projects = get_grouped_projects()
     grouped_wallchain = get_grouped_wallchain_projects()
     
-    # 현재 페이지를 'unified'로 설정하여 네비게이션에서 표시
+    # 현재 페이지를 'SEARCH'로 설정하여 네비게이션에서 표시
     return template('user_lookup.html',
                    lang=lang,
                    current_page='user_lookup',
@@ -664,7 +664,7 @@ def api_user_search():
         return json.dumps([])
     
     try:
-        results = unified_manager.search_users(query, limit=10)
+        results = global_manager.search_users(query, limit=10)
         return json.dumps(results)
     except Exception as e:
         print(f"[API Error] user-search: {e}")
@@ -675,8 +675,11 @@ def api_user_data(username):
     """특정 유저의 전체 데이터 API"""
     response.content_type = 'application/json'
     
+    # 검색 로그 기록
+    log_access('user_lookup',  username)
+    
     try:
-        data = unified_manager.get_user_data(username)
+        data = global_manager.get_user_data(username)
         
         if not data:
             return json.dumps({'error': 'User not found'})
@@ -686,7 +689,7 @@ def api_user_data(username):
         print(f"[API Error] user-data: {e}")
         return json.dumps({'error': str(e)})
 
-# ===================== END UNIFIED ROUTES =====================
+# ===================== END GLOBAL ROUTES =====================
 
 @app.route('/leaderboard')
 @app.route('/leaderboard/')
@@ -887,7 +890,7 @@ def project_leaderboard(projectname):
                                 <img src="{row.profileImageUrl}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;">
                                 <div>
                                     <strong>{row.displayName}</strong><br>
-                                    <small class="text-muted">@{row.username}</small><a href="/{projectname}/user/{row.username}" class="user-link" title="유저 분석">🔍</a>
+                                    <small class="text-muted">@{row.username}</small><a href="/cookie/{projectname}/user/{row.username}" class="user-link" title="유저 분석">🔍</a>
                                 </div>
                             </div>
                         </td>
@@ -1745,7 +1748,7 @@ if __name__ == '__main__':
     print("🌊 Wallchain 프로젝트 초기화를 백그라운드에서 진행합니다...")
     
     # 3. 통합 DB 갱신 스케줄러 시작
-    schedule_unified_updates()
+    schedule_global_updates()
     print("🔄 통합 DB 갱신 스케줄러가 시작되었습니다...")
     
     print("\n" + "="*60)

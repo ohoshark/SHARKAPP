@@ -3,13 +3,13 @@ import os
 from datetime import datetime
 import logging
 
-class UnifiedDataManager:
-    def __init__(self, db_path='./data/unified_rankings.db'):
+class GlobalDataManager:
+    def __init__(self, db_path='./data/global_rankings.db'):
         self.db_path = db_path
         self.init_database()
     
     def init_database(self):
-        """통합 DB 초기화 및 테이블 생성"""
+        """글로벌 DB 초기화 및 테이블 생성"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
@@ -44,7 +44,7 @@ class UnifiedDataManager:
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_displayName ON users(displayName)')
             
             conn.commit()
-            print("[UnifiedDataManager] Database initialized")
+            print("[GlobalDataManager] Database initialized")
     
     def update_user(self, info_name, display_name=None, image_url=None, wal_score=None):
         """유저 정보 업데이트 (wallchain 우선, 변경사항 있으면 갱신)"""
