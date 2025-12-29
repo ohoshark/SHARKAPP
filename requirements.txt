@@ -1,5 +1,0 @@
-bottle
-pandas
-plotly
-waitress
-schedule
