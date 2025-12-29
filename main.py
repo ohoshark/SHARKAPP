@@ -1470,8 +1470,8 @@ def wallchain_leaderboard(projectname):
                 # 2. -9 인덱스를 시도하되, 데이터가 부족하면 0번(최초 데이터)을 선택
                 # max(0, num_ts - 9)를 사용하면 데이터가 5개뿐일 때 -4가 아닌 0번 인덱스를 잡습니다.
                 try:
-                    # 원래 의도하신 -9 인덱스 시도
-                    timestamp1 = timestamps[-10]
+                    # 원래 의도하신 -2 인덱스 시도
+                    timestamp1 = timestamps[-2]
                 except IndexError:
                     # -9가 없을 경우, 리스트의 가장 첫 번째([0]) 데이터를 선택 (최대 가용 범위)
                     timestamp1 = timestamps[0]
