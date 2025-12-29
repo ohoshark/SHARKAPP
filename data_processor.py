@@ -302,8 +302,8 @@ class DataProcessor:
         compare_data['displayName'] = compare_data['displayName_curr'].combine_first(compare_data['displayName_prev']).fillna('')
         compare_data['profileImageUrl'] = compare_data['curr_profileImageUrl'].combine_first(compare_data['prev_profileImageUrl']).fillna('')
         
-        # 여기서 999와 0으로 채움
-        compare_data.fillna({'prev_mindshare': 0, 'curr_mindshare': 0, 'prev_rank': 999, 'curr_rank': 999}, inplace=True)
+        # 여기서 9999와 0으로 채움
+        compare_data.fillna({'prev_mindshare': 0, 'curr_mindshare': 0, 'prev_rank': 9999, 'curr_rank': 9999}, inplace=True)
         
         # 5. 변동폭 계산
         compare_data['rank_change'] = compare_data['prev_rank'] - compare_data['curr_rank']
@@ -316,7 +316,7 @@ class DataProcessor:
 
         # (2) 마인드쉐어 변동 보정: 이전이나 현재 순위 중 하나라도 999(순위 밖)면 마인드쉐어 변동 0 처리
         compare_data[diff_col] = np.where(
-            (compare_data['prev_rank'] == 999) | (compare_data['curr_rank'] == 999), 
+            (compare_data['prev_rank'] == 9999) | (compare_data['curr_rank'] == 9999), 
             0, 
             compare_data[diff_col]
         )
