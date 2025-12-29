@@ -446,7 +446,7 @@ def update_unified_rankings():
                         # 해당 타임스탬프의 모든 유저 데이터
                         cursor.execute('''
                             SELECT username, name, imageUrl, score, 
-                                   position, positionChange
+                                   position, positionChange, mindsharePercentage
                             FROM leaderboard 
                             WHERE timestamp = ? AND timeframe = ?
                         ''', (latest_ts, timeframe))
@@ -460,6 +460,7 @@ def update_unified_rankings():
                             score = row[3]
                             position = row[4]
                             position_change = row[5]
+                            mindshare_percentage = row[6]
                             
                             # 유저 정보 수집 (wallchain 우선 - 덮어쓰기)
                             users_batch[name] = (name, username, image_url, score)
@@ -467,7 +468,7 @@ def update_unified_rankings():
                             # 순위 정보 수집
                             rankings_batch.append((
                                 name, project_name, timeframe,
-                                position, None, None, None, position_change
+                                position, None, mindshare_percentage, None, position_change
                             ))
                 
                 print(f"[Wallchain] {project_name} 완료 ✓")
@@ -585,7 +586,7 @@ def get_language():
 @app.route('/user-lookup')
 def user_lookup_page():
     """통합 검색 페이지"""
-    log_access('user_lookup', 'unified')
+    log_access('user_lookup', 'unified_search')
     lang = get_language()
     
     all_projects = get_cached_projects()
@@ -597,7 +598,7 @@ def user_lookup_page():
     return template('user_lookup.html',
                    lang=lang,
                    current_page='user_lookup',
-                   project='unified',
+                   project='SEARCH',
                    all_projects=all_projects,
                    all_wallchain_projects=all_wallchain_projects,
                    grouped_projects=grouped_projects,
@@ -1657,8 +1658,17 @@ def wallchain_user_analysis(projectname, username):
 # 404 에러 핸들러 추가 (main.py)
 @app.error(404)
 def handle_404(error):
-    log_access('error_page', "UNKNOWN")
-    requested_project = request.url.split('/')[3]
+    requested_url = request.path
+    print(f"[404 ERROR] Requested URL: {requested_url}")  # 디버그용 출력
+    log_access('error_page', requested_url)
+    
+    # URL이 3개 이상의 세그먼트를 가지고 있는지 확인
+    url_parts = request.url.split('/')
+    if len(url_parts) > 3:
+        requested_project = url_parts[3]
+    else:
+        requested_project = "unknown"
+    
     suggestions = [p for p in project_instances.keys() if p.lower() == requested_project.lower()]
     
     if suggestions:

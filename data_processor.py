@@ -117,6 +117,10 @@ class DataProcessor:
                 if all_records:
                     df = pd.DataFrame(all_records)
                     
+                    # smartFollowersDetails 컬럼 제거 (용량 절약을 위해 개수만 저장)
+                    if 'smartFollowersDetails' in df.columns:
+                        df = df.drop('smartFollowersDetails', axis=1)
+                    
                     # 복합 객체(list, dict)를 JSON 문자열로 변환 (추가된 로직)
                     for col in df.columns:
                         if df[col].apply(lambda x: isinstance(x, (list, dict))).any():

@@ -7,12 +7,12 @@
             'search_button': '검색',
             'no_results': '사용자의 정보가 존재하지 않습니다',
             'user_info': '사용자 정보',
-            'cookie_projects': 'Cookie 프로젝트',
-            'wallchain_projects': 'Wallchain 프로젝트',
+            'cookie_projects': 'Cookie',
+            'wallchain_projects': 'Wallchain',
             'rank': '순위',
             'mindshare': '마인드쉐어',
             'c_mindshare': 'c마인드쉐어',
-            'score': 'Score',
+            'score': 'X Score',
             'copy_success': '지갑 주소가 복사되었습니다! 🦈',
             'click_to_copy': '클릭하여 주소 복사 🦈'
         },
@@ -22,12 +22,12 @@
             'search_button': 'Search',
             'no_results': 'User information does not exist',
             'user_info': 'User Information',
-            'cookie_projects': 'Cookie Projects',
-            'wallchain_projects': 'Wallchain Projects',
+            'cookie_projects': 'Cookie',
+            'wallchain_projects': 'Wallchain',
             'rank': 'Rank',
             'mindshare': 'Mindshare',
             'c_mindshare': 'cMindshare',
-            'score': 'Score',
+            'score': 'X Score',
             'copy_success': 'Wallet address copied! 🦈',
             'click_to_copy': 'Click to copy address🦈'
         }
@@ -81,7 +81,7 @@
     
     .projects-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 15px;
         margin-bottom: 20px;
     }
@@ -96,6 +96,30 @@
         margin-bottom: 0;
         border-left: 4px solid #007bff;
         height: 100%;
+        position: relative;
+    }
+    
+    .user-detail-link {
+        position: absolute;
+        top: 0px;
+        right: 0px;
+        width: 32px;
+        height: 32px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-size: 1.1rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        transition: all 0.2s;
+        z-index: 10;
+    }
+    
+    .user-detail-link:hover {
+        transform: scale(1.1);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.25);
     }
     
     .wallchain-card {
@@ -105,22 +129,70 @@
     .project-card .card-title {
         font-size: 1rem;
         margin-bottom: 10px;
-        color: #333;
+        color: #fff;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 10px 15px;
+        border-radius: 5px;
+        text-align: left;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+    }
+    
+    .project-card .card-title .flag-emoji {
+        background: white;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        line-height: 1;
+    }
+    
+    .wallchain-card .card-title {
+        background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+    }
+    
+    .timeframe-container {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        align-items: start;
     }
     
     .timeframe-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        margin: 3px;
+        display: grid;
+        grid-template-columns: 45px 1fr auto;
+        gap: 8px;
+        align-items: center;
+        padding: 6px 10px;
+        margin: 0;
         background: #f8f9fa;
         border-radius: 4px;
         font-size: 0.85rem;
-        white-space: nowrap;
+    }
+    
+    .timeframe-label {
+        font-weight: 500;
+        color: #495057;
     }
     
     .rank-info {
         font-weight: bold;
         color: #007bff;
+        text-align: center;
+    }
+    
+    .percent-info {
+        color: #28a745;
+        text-align: right;
+        font-weight: 700;
     }
     
     .position-change {
@@ -135,7 +207,6 @@
 
 <div class="container mt-4">
     <div class="search-container">
-        <h2 class="text-center mb-4">{{t['unified_search']}}</h2>
         
         <div class="card shadow-sm mb-4">
             <div class="card-body">
@@ -251,6 +322,11 @@ searchInput.addEventListener('keypress', function(e) {
 function loadUserData(username) {
     searchResults.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
     
+    // URL에 username 추가
+    const url = new URL(window.location);
+    url.searchParams.set('username', username);
+    window.history.pushState({}, '', url);
+    
     fetch(`/api/user-data/${encodeURIComponent(username)}`)
         .then(res => {
             if (!res.ok) {
@@ -290,6 +366,22 @@ function sortTimeframes(rankings) {
     });
 }
 
+// Cookie 프로젝트명 포맷 함수 (언어 플래그 추가 및 언어 코드 제거)
+function formatCookieProjectName(projectName, suffix) {
+    const flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'};
+    const upperName = projectName.toUpperCase();
+    
+    // 언어 코드 패턴 확인
+    const langMatch = upperName.match(/-(EN|KO|PT|ES|ZH)$/);
+    if (langMatch) {
+        const lang = langMatch[1].toLowerCase();
+        const baseName = upperName.substring(0, upperName.length - 3); // -XX 제거
+        const flag = flags[lang] || '🌐';
+        return `<span class="flag-emoji">${flag}</span><span>${baseName} ${suffix}</span>`;
+    }
+    return `<span>${upperName} ${suffix}</span>`;
+}
+
 // 사용자 데이터 렌더링
 function renderUserData(data) {
     const user = data.user;
@@ -309,8 +401,12 @@ function renderUserData(data) {
                                 ${user.displayName || user.infoName}
                             </a>
                         </h3>
-                        <p class="text-muted mb-2">@${user.infoName}</p>
-                        ${user.wal_score ? `<p class="mb-0"><strong>{{t['score']}}:</strong> ${user.wal_score.toLocaleString()}</p>` : ''}
+                        <p class="text-muted mb-2">
+                            <a href="https://x.com/${user.infoName}" target="_blank" class="text-decoration-none">
+                              @${user.infoName}
+                            </a>
+                        </p>
+                        ${user.wal_score ? `<p class="mb-0"><strong>{{t['score']}}</strong> ${user.wal_score.toLocaleString()}</p>` : ''}
                     </div>
                 </div>
             </div>
@@ -326,44 +422,51 @@ function renderUserData(data) {
         Object.keys(data.cookie_projects).sort().forEach(projectName => {
             const rankings = sortTimeframes(data.cookie_projects[projectName]);
             
-            // 마쉐 랭킹 (snapsPercent > 0인 경우만)
-            const msRankings = rankings.filter(r => r.msRank && r.snapsPercent > 0);
+            // 마쉐 랭킹 (ms > 0인 경우만)
+            const msRankings = rankings.filter(r => r.msRank && r.ms > 0);
             
-            // c마쉐 랭킹 (cSnapsPercent > 0인 경우만)
-            const cmsRankings = rankings.filter(r => r.cmsRank && r.cSnapsPercent > 0);
+            // c마쉐 랭킹 (cms > 0인 경우만)
+            const cmsRankings = rankings.filter(r => r.cmsRank && r.cms > 0);
             
-            // 둘 다 없으면 카드 자체를 표시하지 않음
-            if (msRankings.length === 0 && cmsRankings.length === 0) {
-                return;
-            }
-            
-            html += `<div class="card project-card">
-                <div class="card-body">
-                    <h5 class="card-title">${projectName.toUpperCase()}</h5>`;
-            
+            // 마쉐 카드
             if (msRankings.length > 0) {
-                html += `<div class="mb-2"><strong>{{t['mindshare']}}:</strong><br>`;
+                const displayName = formatCookieProjectName(projectName, '(MS)');
+                html += `<div class="card project-card">
+                    <div class="card-body">
+                        <a href="/cookie/${projectName}/user/${user.infoName}?metric=snapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                        <h5 class="card-title">${displayName}</h5>
+                        <div class="timeframe-container">`;
+                
                 msRankings.forEach(r => {
                     html += `<span class="timeframe-badge">
-                        ${r.timeframe}: <span class="rank-info">#${r.msRank}</span>
-                        ${r.snapsPercent ? ` (${r.snapsPercent.toFixed(2)}%)` : ''}
+                        <span class="timeframe-label">${r.timeframe}</span>
+                        <span class="rank-info">#${r.msRank}</span>
+                        <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
                     </span>`;
                 });
-                html += `</div>`;
+                
+                html += `</div></div></div>`;
             }
             
+            // c마쉐 카드 (별도 카드)
             if (cmsRankings.length > 0) {
-                html += `<div><strong>{{t['c_mindshare']}}:</strong><br>`;
+                const displayName = formatCookieProjectName(projectName, '(cMS)');
+                html += `<div class="card project-card">
+                    <div class="card-body">
+                        <a href="/cookie/${projectName}/user/${user.infoName}?metric=cSnapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                        <h5 class="card-title">${displayName}</h5>
+                        <div class="timeframe-container">`;
+                
                 cmsRankings.forEach(r => {
                     html += `<span class="timeframe-badge">
-                        ${r.timeframe}: <span class="rank-info">#${r.cmsRank}</span>
-                        ${r.cSnapsPercent ? ` (${r.cSnapsPercent.toFixed(2)}%)` : ''}
+                        <span class="timeframe-label">${r.timeframe}</span>
+                        <span class="rank-info">#${r.cmsRank}</span>
+                        <span class="percent-info">${r.cms ? `${r.cms.toFixed(3)}%` : ''}</span>
                     </span>`;
                 });
-                html += `</div>`;
+                
+                html += `</div></div></div>`;
             }
-            
-            html += `</div></div>`;
         });
         
         html += `</div></div>`;
@@ -372,12 +475,13 @@ function renderUserData(data) {
     // Wallchain 프로젝트
     if (Object.keys(data.wallchain_projects).length > 0) {
         html += `<div class="project-section">
-            <h4 class="mb-3">🌊 {{t['wallchain_projects']}}</h4>
+            <h4 class="mb-3">🦆 {{t['wallchain_projects']}}</h4>
             <div class="projects-grid">`;
         
         Object.keys(data.wallchain_projects).sort().forEach(projectName => {
             const rankings = sortTimeframes(data.wallchain_projects[projectName]);
-            const displayName = projectName.replace('wallchain-', '').toUpperCase();
+            const projectShortName = projectName.replace('wallchain-', '');
+            const displayName = projectShortName.toUpperCase();
             
             // 순위가 없으면 카드를 표시하지 않음
             if (rankings.length === 0) {
@@ -386,18 +490,28 @@ function renderUserData(data) {
             
             html += `<div class="card project-card wallchain-card">
                 <div class="card-body">
-                    <h5 class="card-title">${displayName}</h5>
-                    <div>`;
+                    <a href="/wallchain/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
+                    <div class="timeframe-container">`;
             
             rankings.forEach(r => {
-                const changeIcon = r.positionChange > 0 ? '↑' : r.positionChange < 0 ? '↓' : '−';
+                const changeIcon = r.positionChange > 0 ? '↑' : r.positionChange < 0 ? '↓' : '';
                 const changeColor = r.positionChange > 0 ? 'success' : r.positionChange < 0 ? 'danger' : 'secondary';
+                const displayTimeframe = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2');
+                
+                let changeDisplay = '';
+                if (r.positionChange !== null) {
+                    if (r.positionChange === 0) {
+                        changeDisplay = `<span class="position-change text-${changeColor}">(0)</span>`;
+                    } else {
+                        changeDisplay = `<span class="position-change text-${changeColor}">(${changeIcon}${Math.abs(r.positionChange)})</span>`;
+                    }
+                }
                 
                 html += `<span class="timeframe-badge">
-                    ${r.timeframe}: <span class="rank-info">#${r.msRank}</span>
-                    ${r.positionChange !== null ? 
-                        `<span class="position-change text-${changeColor}">(${changeIcon}${Math.abs(r.positionChange)})</span>` 
-                        : ''}
+                    <span class="timeframe-label">${displayTimeframe}</span>
+                    <span class="rank-info">#${r.msRank} ${changeDisplay}</span>
+                    <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
                 </span>`;
             });
             
@@ -410,6 +524,16 @@ function renderUserData(data) {
     searchResults.innerHTML = html;
     twemoji.parse(document.body);
 }
+
+// 페이지 로드 시 URL에서 username 확인하고 자동 검색
+window.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    if (username) {
+        searchInput.value = username;
+        loadUserData(username);
+    }
+});
 </script>
 
 % include('_footer.html')

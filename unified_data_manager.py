@@ -32,8 +32,8 @@ class UnifiedDataManager:
                     timeframe TEXT,
                     msRank INTEGER,
                     cmsRank INTEGER,
-                    snapsPercent REAL,
-                    cSnapsPercent REAL,
+                    ms REAL,
+                    cms REAL,
                     positionChange INTEGER,
                     UNIQUE(infoName, projectName, timeframe)
                 )
@@ -76,7 +76,7 @@ class UnifiedDataManager:
             conn.commit()
     
     def update_ranking(self, info_name, project_name, timeframe, ms_rank=None, 
-                      cms_rank=None, snaps_percent=None, c_snaps_percent=None, 
+                      cms_rank=None, ms=None, cms=None, 
                       position_change=None):
         """순위 정보 업데이트"""
         with sqlite3.connect(self.db_path) as conn:
@@ -84,10 +84,10 @@ class UnifiedDataManager:
             
             cursor.execute('''
                 INSERT OR REPLACE INTO rankings 
-                (infoName, projectName, timeframe, msRank, cmsRank, snapsPercent, cSnapsPercent, positionChange)
+                (infoName, projectName, timeframe, msRank, cmsRank, ms, cms, positionChange)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (info_name, project_name, timeframe, ms_rank, cms_rank, 
-                  snaps_percent, c_snaps_percent, position_change))
+                  ms, cms, position_change))
             
             conn.commit()
     
@@ -137,7 +137,7 @@ class UnifiedDataManager:
             
             # 순위 정보 (프로젝트별로 그룹화)
             cursor.execute('''
-                SELECT projectName, timeframe, msRank, cmsRank, snapsPercent, cSnapsPercent, positionChange
+                SELECT projectName, timeframe, msRank, cmsRank, ms, cms, positionChange
                 FROM rankings
                 WHERE infoName = ?
                 ORDER BY projectName, timeframe
@@ -154,16 +154,16 @@ class UnifiedDataManager:
                 timeframe = row[1]
                 ms_rank = row[2]
                 cms_rank = row[3]
-                snaps_percent = row[4]
-                c_snaps_percent = row[5]
+                ms = row[4]
+                cms = row[5]
                 position_change = row[6]
                 
                 ranking_data = {
                     'timeframe': timeframe,
                     'msRank': ms_rank,
                     'cmsRank': cms_rank,
-                    'snapsPercent': snaps_percent,
-                    'cSnapsPercent': c_snaps_percent,
+                    'ms': ms,
+                    'cms': cms,
                     'positionChange': position_change
                 }
                 
@@ -216,8 +216,8 @@ class UnifiedDataManager:
                     timeframe TEXT,
                     msRank INTEGER,
                     cmsRank INTEGER,
-                    snapsPercent REAL,
-                    cSnapsPercent REAL,
+                    ms REAL,
+                    cms REAL,
                     positionChange INTEGER,
                     UNIQUE(infoName, projectName, timeframe)
                 )
@@ -241,7 +241,7 @@ class UnifiedDataManager:
             cursor = conn.cursor()
             cursor.executemany('''
                 INSERT OR REPLACE INTO rankings_temp 
-                (infoName, projectName, timeframe, msRank, cmsRank, snapsPercent, cSnapsPercent, positionChange)
+                (infoName, projectName, timeframe, msRank, cmsRank, ms, cms, positionChange)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', rankings_data)
             conn.commit()
