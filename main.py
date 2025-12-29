@@ -314,6 +314,85 @@ def init_wallchain_on_startup():
             # 백그라운드 스레드 시작
             start_wallchain_loader_thread(project_id)
             print(f"🌊 Registered: {project_id} as '{friendly_name}' (데이터 로드 중...)")
+
+def scan_for_new_projects():
+    """주기적으로 새로운 프로젝트를 스캔하여 등록"""
+    def periodic_scanner():
+        while True:
+            try:
+                time.sleep(300)  # 5분마다 스캔
+                
+                # Cookie 프로젝트 스캔
+                if os.path.exists(base_data_dir):
+                    for project_name in os.listdir(base_data_dir):
+                        project_path = os.path.join(base_data_dir, project_name)
+                        if not os.path.isdir(project_path) or project_name.startswith('_'):
+                            continue
+                        
+                        for lang in os.listdir(project_path):
+                            lang_path = os.path.join(project_path, lang)
+                            
+                            if os.path.isdir(lang_path) and not lang.startswith('_'):
+                                project_id = f"{project_name}-{lang}"
+                                
+                                # 아직 등록되지 않은 프로젝트인 경우
+                                if project_id not in project_instances:
+                                    friendly_name = f"{project_name} ({lang.upper()})"
+                                    print(f"\n🆕 새로운 Cookie 프로젝트 발견: {project_id}")
+                                    
+                                    # DataProcessor 생성
+                                    dp = DataProcessor(lang_path)
+                                    dp.project_display_title = friendly_name 
+                                    dp.project_name = f"{project_name}"
+                                    dp.lang = f"{lang}"
+                                    
+                                    project_instances[project_id] = dp
+                                    
+                                    # 백그라운드 스레드 시작
+                                    start_data_loader_thread(project_id)
+                                    print(f"🚀 Registered: {project_id} as '{friendly_name}' (데이터 로드 중...)")
+                                    
+                                    # 캐시 무효화
+                                    PROJECT_CACHE["list"] = []
+                                    PROJECT_CACHE["grouped"] = {}
+                
+                # Wallchain 프로젝트 스캔
+                if os.path.exists(base_wallchain_dir):
+                    for project_name in os.listdir(base_wallchain_dir):
+                        project_path = os.path.join(base_wallchain_dir, project_name)
+                        if not os.path.isdir(project_path) or project_name.startswith('_') or project_name.startswith('.'):
+                            continue
+                        
+                        global_path = os.path.join(project_path, 'global')
+                        if os.path.isdir(global_path):
+                            project_id = f"wallchain-{project_name}"
+                            
+                            # 아직 등록되지 않은 프로젝트인 경우
+                            if project_id not in wallchain_instances:
+                                friendly_name = f"Wallchain: {project_name.upper()}"
+                                print(f"\n🆕 새로운 Wallchain 프로젝트 발견: {project_id}")
+                                
+                                # DataProcessorWallchain 생성
+                                dp = DataProcessorWallchain(global_path)
+                                dp.project_display_title = friendly_name 
+                                dp.project_name = f"{project_name}"
+                                
+                                wallchain_instances[project_id] = dp
+                                
+                                # 백그라운드 스레드 시작
+                                start_wallchain_loader_thread(project_id)
+                                print(f"🌊 Registered: {project_id} as '{friendly_name}' (데이터 로드 중...)")
+                                
+                                # 캐시 무효화
+                                WALLCHAIN_CACHE["list"] = []
+                                WALLCHAIN_CACHE["grouped"] = {}
+                
+            except Exception as e:
+                print(f"[프로젝트 스캐너] 오류: {e}")
+    
+    thread = threading.Thread(target=periodic_scanner, daemon=True)
+    thread.start()
+    print("[프로젝트 스캐너] 5분마다 새 프로젝트 탐색 시작")
                 
 def render_error(error_message, project_name=None):
     try:
@@ -1747,9 +1826,12 @@ if __name__ == '__main__':
     wallchain_init_thread.start()
     print("🌊 Wallchain 프로젝트 초기화를 백그라운드에서 진행합니다...")
     
-    # 3. 통합 DB 갱신 스케줄러 시작
+    # 3. 새 프로젝트 스캔 스레드 시작
+    scan_for_new_projects()
+    
+    # 4. 글로벌 DB 갱신 스케줄러 시작
     schedule_global_updates()
-    print("🔄 통합 DB 갱신 스케줄러가 시작되었습니다...")
+    print("🔄 글로벌 DB 갱신 스케줄러가 시작되었습니다...")
     
     print("\n" + "="*60)
     print("🌐 Waitress Server Running on http://0.0.0.0:8080")
