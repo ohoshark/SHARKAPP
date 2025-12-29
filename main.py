@@ -374,7 +374,7 @@ def update_unified_rankings():
         rankings_batch = []  # [(infoName, projectName, timeframe, ...)]
         
         # Cookie 프로젝트 데이터 수집
-        for project_name, dp in project_instances.items():
+        for project_name, dp in list(project_instances.items()):
             try:
                 print(f"[Cookie] {project_name} 처리 중...")
                 
@@ -394,7 +394,7 @@ def update_unified_rankings():
                         # 해당 타임스탬프의 모든 유저 데이터
                         cursor.execute('''
                             SELECT username, displayName, profileImageUrl, 
-                                   snapsRank, cSnapsRank, snapsPercent, cSnapsPercent
+                                   rank, cSnapsPercentRank, snapsPercent, cSnapsPercent
                             FROM snaps 
                             WHERE timestamp = ? AND timeframe = ?
                         ''', (latest_ts, timeframe))
@@ -405,10 +405,10 @@ def update_unified_rankings():
                             username = row[0]
                             display_name = row[1]
                             image_url = row[2]
-                            snaps_rank = row[3]
-                            c_snaps_rank = row[4]
-                            snaps_percent = row[5]
-                            c_snaps_percent = row[6]
+                            ms_rank = row[3]  # rank -> ms_rank
+                            cms_rank = row[4]  # cSnapsPercentRank -> cms_rank
+                            ms_percent = row[5]  # snapsPercent -> ms_percent
+                            cms_percent = row[6]  # cSnapsPercent -> cms_percent
                             
                             # 유저 정보 수집 (wallchain 우선이므로 없을 때만)
                             if username not in users_batch:
@@ -417,7 +417,7 @@ def update_unified_rankings():
                             # 순위 정보 수집
                             rankings_batch.append((
                                 username, project_name, timeframe, 
-                                snaps_rank, c_snaps_rank, snaps_percent, c_snaps_percent, None
+                                ms_rank, cms_rank, ms_percent, cms_percent, None
                             ))
                 
                 print(f"[Cookie] {project_name} 완료 ✓")
@@ -426,7 +426,7 @@ def update_unified_rankings():
                 print(f"[Cookie] {project_name} 오류: {e}")
         
         # Wallchain 프로젝트 데이터 수집
-        for project_name, dp in wallchain_instances.items():
+        for project_name, dp in list(wallchain_instances.items()):
             try:
                 print(f"[Wallchain] {project_name} 처리 중...")
                 
@@ -454,8 +454,8 @@ def update_unified_rankings():
                         rows = cursor.fetchall()
                         
                         for row in rows:
-                            name = row[0]  # wallchain의 username
-                            username = row[1]  # wallchain의 name (실제 handle)
+                            username = row[0]  # wallchain의 username (실제 X 핸들, infoName으로 사용)
+                            display_name = row[1]  # wallchain의 name (표시 이름)
                             image_url = row[2]
                             score = row[3]
                             position = row[4]
@@ -463,11 +463,11 @@ def update_unified_rankings():
                             mindshare_percentage = row[6]
                             
                             # 유저 정보 수집 (wallchain 우선 - 덮어쓰기)
-                            users_batch[name] = (name, username, image_url, score)
+                            users_batch[username] = (username, display_name, image_url, score)
                             
                             # 순위 정보 수집
                             rankings_batch.append((
-                                name, project_name, timeframe,
+                                username, project_name, timeframe,
                                 position, None, mindshare_percentage, None, position_change
                             ))
                 
@@ -483,6 +483,40 @@ def update_unified_rankings():
         
         # 원자적 교체
         unified_manager.commit_batch_update()
+        
+        # 갱신되지 않은 row의 ms, cms를 0으로 설정 (OUT OF RANK 처리)
+        print("[통합 DB] OUT OF RANK 유저 처리 중...")
+        try:
+            # 이번에 수집된 (infoName, projectName, timeframe) 조합
+            collected_keys = set()
+            for batch in rankings_batch:
+                infoName, projectName, timeframe = batch[0], batch[1], batch[2]
+                collected_keys.add((infoName, projectName, timeframe))
+            
+            # DB에서 갱신되지 않은 row 찾아서 ms, cms를 0으로
+            with sqlite3.connect('./data/unified_rankings.db') as conn:
+                cursor = conn.cursor()
+                
+                # 모든 rankings의 key 가져오기
+                cursor.execute('SELECT infoName, projectName, timeframe FROM rankings')
+                all_rows = cursor.fetchall()
+                
+                out_of_rank_count = 0
+                for row in all_rows:
+                    key = (row[0], row[1], row[2])
+                    if key not in collected_keys:
+                        # 이번에 수집되지 않은 row -> ms, cms를 0으로
+                        cursor.execute('''
+                            UPDATE rankings 
+                            SET ms = 0, cms = 0 
+                            WHERE infoName = ? AND projectName = ? AND timeframe = ?
+                        ''', (row[0], row[1], row[2]))
+                        out_of_rank_count += 1
+                
+                conn.commit()
+                print(f"[통합 DB] OUT OF RANK 처리 완료: {out_of_rank_count}건")
+        except Exception as e:
+            print(f"[통합 DB] OUT OF RANK 처리 오류: {e}")
         
         print(f"\n{'='*60}")
         print(f"[통합 DB 갱신 완료] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -500,6 +534,19 @@ def schedule_unified_updates():
     # DB가 비어있으면 즉시 갱신, 아니면 5분 후 갱신
     def initial_update():
         try:
+            # 프로젝트 초기화가 완료될 때까지 대기 (최대 60초)
+            print("[통합 DB] 프로젝트 초기화 대기 중...")
+            wait_time = 0
+            while (not project_instances or not wallchain_instances) and wait_time < 60:
+                time.sleep(1)
+                wait_time += 1
+            
+            if not project_instances and not wallchain_instances:
+                print("[통합 DB] 경고: 프로젝트가 초기화되지 않았습니다.")
+                return
+            
+            print(f"[통합 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}")
+            
             # 데이터베이스에 데이터가 있는지 확인
             conn = sqlite3.connect('./data/unified_rankings.db')
             cursor = conn.cursor()
@@ -516,8 +563,10 @@ def schedule_unified_updates():
                 update_unified_rankings()
         except Exception as e:
             print(f"[통합 DB 초기화 오류] {e}")
-            # 오류 발생 시 즉시 갱신 시도
-            update_unified_rankings()
+            # 오류 발생 시에도 프로젝트가 있으면 갱신 시도
+            if project_instances or wallchain_instances:
+                print("[통합 DB] 오류 발생했지만 갱신 시도...")
+                update_unified_rankings()
     
     threading.Thread(target=initial_update, daemon=True).start()
     

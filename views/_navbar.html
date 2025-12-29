@@ -23,7 +23,11 @@
                             </a>
                         </li>
                         <div class="collapse" id="wallchainProjectsCollapse">
-                        % for proj_name in sorted(grouped_wallchain.keys()):
+                        <% 
+                            # 그룹화된 프로젝트(len > 1)를 상단에, 단일 프로젝트를 하단에 배치
+                            sorted_wall_projects = sorted(grouped_wallchain.keys(), key=lambda x: (len(grouped_wallchain[x]) == 1, x))
+                        %>
+                        % for proj_name in sorted_wall_projects:
                             <% items = grouped_wallchain[proj_name] %>
                             % if len(items) == 1:
                                 <% 
@@ -71,7 +75,11 @@
                             </a>
                         </li>
                         <div class="collapse" id="cookieProjectsCollapse">
-                        % for proj_name in sorted(grouped_projects.keys()):
+                        <% 
+                            # 그룹화된 프로젝트(len > 1)를 상단에, 단일 프로젝트를 하단에 배치
+                            sorted_cookie_projects = sorted(grouped_projects.keys(), key=lambda x: (len(grouped_projects[x]) == 1, x))
+                        %>
+                        % for proj_name in sorted_cookie_projects:
                             <% items = grouped_projects[proj_name] %>
                             % if len(items) == 1:
                                 <% 

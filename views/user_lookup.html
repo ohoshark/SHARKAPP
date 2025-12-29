@@ -3,7 +3,7 @@
     i18n = {
         'ko': {
             'unified_search': '통합 검색',
-            'search_placeholder': 'Handle을 입력하세요 (예: elonmusk)',
+            'search_placeholder': '핸들 또는 닉네임을 입력하세요 (예: ohoshark)',
             'search_button': '검색',
             'no_results': '사용자의 정보가 존재하지 않습니다',
             'user_info': '사용자 정보',
@@ -18,7 +18,7 @@
         },
         'en': {
             'unified_search': 'GLOBAL Search',
-            'search_placeholder': 'Enter handle (e.g., elonmusk)',
+            'search_placeholder': 'Enter handle or nickname (e.g., ohoshark)',
             'search_button': 'Search',
             'no_results': 'User information does not exist',
             'user_info': 'User Information',
@@ -65,7 +65,8 @@
         gap: 10px;
     }
     
-    .autocomplete-item:hover {
+    .autocomplete-item:hover,
+    .autocomplete-item.active {
         background-color: #f8f9fa;
     }
     
@@ -101,7 +102,7 @@
     
     .user-detail-link {
         position: absolute;
-        top: 0px;
+        top: 45px;
         right: 0px;
         width: 32px;
         height: 32px;
@@ -115,6 +116,30 @@
         box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         transition: all 0.2s;
         z-index: 10;
+    }
+    
+    .project-type-icon {
+        position: absolute;
+        top: -15px;
+        left: -15px;
+        width: 48px;
+        height: 48px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        z-index: 10;
+    }
+    
+    .project-type-icon.wallchain {
+        top: -15px;
+        left: -15px;
+        width: 48px;
+        height: 48px;
+        font-size: 2.2rem;
     }
     
     .user-detail-link:hover {
@@ -233,6 +258,7 @@
 
 <script>
 let searchTimeout;
+let selectedIndex = -1; // 키보드로 선택된 항목 인덱스
 const searchInput = document.getElementById('userSearchInput');
 const autocompleteDropdown = document.getElementById('autocompleteDropdown');
 const searchButton = document.getElementById('searchButton');
@@ -242,6 +268,7 @@ const searchResults = document.getElementById('searchResults');
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
     const query = this.value.trim();
+    selectedIndex = -1; // 검색어 변경 시 선택 초기화
     
     if (query.length < 2) {
         autocompleteDropdown.style.display = 'none';
@@ -292,10 +319,59 @@ searchInput.addEventListener('input', function() {
     }, 300);
 });
 
+// 키보드 방향키 및 엔터 처리
+searchInput.addEventListener('keydown', function(e) {
+    const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
+    
+    if (items.length === 0) return;
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = (selectedIndex + 1) % items.length;
+        updateSelection(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+        updateSelection(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < items.length) {
+            // 선택된 항목이 있으면 해당 유저 로드
+            const username = items[selectedIndex].dataset.username;
+            searchInput.value = username;
+            autocompleteDropdown.style.display = 'none';
+            loadUserData(username);
+        } else {
+            // 선택된 항목이 없으면 입력값으로 검색
+            const username = this.value.trim();
+            if (username) {
+                autocompleteDropdown.style.display = 'none';
+                loadUserData(username);
+            }
+        }
+    } else if (e.key === 'Escape') {
+        autocompleteDropdown.style.display = 'none';
+        selectedIndex = -1;
+    }
+});
+
+// 선택된 항목 업데이트 (하이라이트)
+function updateSelection(items) {
+    items.forEach((item, index) => {
+        if (index === selectedIndex) {
+            item.classList.add('active');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
 // 외부 클릭 시 드롭다운 닫기
 document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
         autocompleteDropdown.style.display = 'none';
+        selectedIndex = -1;
     }
 });
 
@@ -304,17 +380,6 @@ searchButton.addEventListener('click', function() {
     const username = searchInput.value.trim();
     if (username) {
         loadUserData(username);
-    }
-});
-
-// Enter 키 검색
-searchInput.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        const username = this.value.trim();
-        if (username) {
-            autocompleteDropdown.style.display = 'none';
-            loadUserData(username);
-        }
     }
 });
 
@@ -416,7 +481,6 @@ function renderUserData(data) {
     // Cookie 프로젝트
     if (Object.keys(data.cookie_projects).length > 0) {
         html += `<div class="project-section">
-            <h4 class="mb-3">🍪 {{t['cookie_projects']}}</h4>
             <div class="projects-grid">`;
         
         Object.keys(data.cookie_projects).sort().forEach(projectName => {
@@ -433,6 +497,7 @@ function renderUserData(data) {
                 const displayName = formatCookieProjectName(projectName, '(MS)');
                 html += `<div class="card project-card">
                     <div class="card-body">
+                        <span class="project-type-icon">🍪</span>
                         <a href="/cookie/${projectName}/user/${user.infoName}?metric=snapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
                         <h5 class="card-title">${displayName}</h5>
                         <div class="timeframe-container">`;
@@ -453,6 +518,7 @@ function renderUserData(data) {
                 const displayName = formatCookieProjectName(projectName, '(cMS)');
                 html += `<div class="card project-card">
                     <div class="card-body">
+                        <span class="project-type-icon">🍪</span>
                         <a href="/cookie/${projectName}/user/${user.infoName}?metric=cSnapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
                         <h5 class="card-title">${displayName}</h5>
                         <div class="timeframe-container">`;
@@ -475,7 +541,6 @@ function renderUserData(data) {
     // Wallchain 프로젝트
     if (Object.keys(data.wallchain_projects).length > 0) {
         html += `<div class="project-section">
-            <h4 class="mb-3">🦆 {{t['wallchain_projects']}}</h4>
             <div class="projects-grid">`;
         
         Object.keys(data.wallchain_projects).sort().forEach(projectName => {
@@ -490,6 +555,7 @@ function renderUserData(data) {
             
             html += `<div class="card project-card wallchain-card">
                 <div class="card-body">
+                    <span class="project-type-icon wallchain">🦆</span>
                     <a href="/wallchain/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
                     <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
                     <div class="timeframe-container">`;
