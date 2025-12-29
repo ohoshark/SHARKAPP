@@ -119,15 +119,26 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto ms-lg-4 me-lg-auto text-end text-lg-start">
                 <%
-                    # 현재 페이지가 wallchain인지 확인
+                    # 현재 페이지가 wallchain인지, 통합 검색인지 확인
                     is_wallchain = get('is_wallchain', False)
-                    base_url = f"/wallchain/{project}" if is_wallchain else f"/cookie/{project}"
+                    is_unified = (project == 'unified' or current_page == 'user_lookup')
+                    
+                    if not is_unified:
+                        base_url = f"/wallchain/{project}" if is_wallchain else f"/cookie/{project}"
+                    end
                 %>
+                % if not is_unified:
+                    <li class="nav-item">
+                        <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="{{base_url}}/">{{t['user_analysis']}}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="{{base_url}}/leaderboard">{{t['leaderboard_analysis']}}</a>
+                    </li>
+                % end
                 <li class="nav-item">
-                    <a class="nav-link {{'active' if current_page == 'user' else ''}}" href="{{base_url}}/">{{t['user_analysis']}}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{'active' if current_page == 'leaderboard' else ''}}" href="{{base_url}}/leaderboard">{{t['leaderboard_analysis']}}</a>
+                    <a class="nav-link {{'active' if current_page == 'user_lookup' else ''}}" href="/user-lookup">
+                        <i class="fas fa-search"></i> {{'통합 검색' if lang == 'ko' else 'Unified Search'}}
+                    </a>
                 </li>
             </ul>
                     

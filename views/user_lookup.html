@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<%
+    i18n = {
+        'ko': {
+            'unified_search': '통합 검색',
+            'search_placeholder': 'Handle을 입력하세요 (예: elonmusk)',
+            'search_button': '검색',
+            'no_results': '사용자의 정보가 존재하지 않습니다',
+            'user_info': '사용자 정보',
+            'cookie_projects': 'Cookie 프로젝트',
+            'wallchain_projects': 'Wallchain 프로젝트',
+            'rank': '순위',
+            'mindshare': '마인드쉐어',
+            'c_mindshare': 'c마인드쉐어',
+            'score': 'Score',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+            'unified_search': 'Unified Search',
+            'search_placeholder': 'Enter handle (e.g., elonmusk)',
+            'search_button': 'Search',
+            'no_results': 'User information does not exist',
+            'user_info': 'User Information',
+            'cookie_projects': 'Cookie Projects',
+            'wallchain_projects': 'Wallchain Projects',
+            'rank': 'Rank',
+            'mindshare': 'Mindshare',
+            'c_mindshare': 'cMindshare',
+            'score': 'Score',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
+% include('_head.html')
+<style>
+    .search-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .autocomplete-dropdown {
+        position: absolute;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        border-radius: 0 0 0.25rem 0.25rem;
+        max-height: 300px;
+        overflow-y: auto;
+        width: 100%;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: none;
+    }
+    
+    .autocomplete-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .autocomplete-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .autocomplete-item img {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
+    
+    .project-section {
+        margin-top: 30px;
+    }
+    
+    .projects-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    @media (max-width: 768px) {
+        .projects-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    .project-card {
+        margin-bottom: 0;
+        border-left: 4px solid #007bff;
+        height: 100%;
+    }
+    
+    .wallchain-card {
+        border-left-color: #17a2b8;
+    }
+    
+    .project-card .card-title {
+        font-size: 1rem;
+        margin-bottom: 10px;
+        color: #333;
+    }
+    
+    .timeframe-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        margin: 3px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    
+    .rank-info {
+        font-weight: bold;
+        color: #007bff;
+    }
+    
+    .position-change {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+</style>
+<title>{{t['unified_search']}} - SHARKAPP</title>
+</head>
+<body>
+% include('_navbar.html')
+
+<div class="container mt-4">
+    <div class="search-container">
+        <h2 class="text-center mb-4">{{t['unified_search']}}</h2>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="position-relative">
+                    <div class="input-group">
+                        <input type="text" 
+                               class="form-control form-control-lg" 
+                               id="userSearchInput" 
+                               placeholder="{{t['search_placeholder']}}"
+                               autocomplete="off">
+                        <button class="btn btn-primary" type="button" id="searchButton">
+                            <i class="fas fa-search"></i> {{t['search_button']}}
+                        </button>
+                    </div>
+                    <div id="autocompleteDropdown" class="autocomplete-dropdown"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 검색 결과 영역 -->
+        <div id="searchResults"></div>
+    </div>
+</div>
+
+<script>
+let searchTimeout;
+const searchInput = document.getElementById('userSearchInput');
+const autocompleteDropdown = document.getElementById('autocompleteDropdown');
+const searchButton = document.getElementById('searchButton');
+const searchResults = document.getElementById('searchResults');
+
+// 자동완성
+searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+        autocompleteDropdown.style.display = 'none';
+        return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+        fetch(`/api/user-search?q=${encodeURIComponent(query)}`)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log('Search results:', data);
+                if (!data || data.length === 0) {
+                    autocompleteDropdown.style.display = 'none';
+                    return;
+                }
+                
+                autocompleteDropdown.innerHTML = data.map(user => `
+                    <div class="autocomplete-item" data-username="${user.infoName}">
+                        ${user.imageUrl ? `<img src="${user.imageUrl}" alt="${user.displayName || user.infoName}">` : ''}
+                        <div>
+                            <strong>${user.displayName || user.infoName}</strong>
+                            <div class="text-muted">@${user.infoName}</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                autocompleteDropdown.style.display = 'block';
+                
+                // 클릭 이벤트
+                document.querySelectorAll('.autocomplete-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        const username = this.dataset.username;
+                        searchInput.value = username;
+                        autocompleteDropdown.style.display = 'none';
+                        loadUserData(username);
+                    });
+                });
+            })
+            .catch(err => {
+                console.error('Search error:', err);
+                autocompleteDropdown.style.display = 'none';
+            });
+    }, 300);
+});
+
+// 외부 클릭 시 드롭다운 닫기
+document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
+        autocompleteDropdown.style.display = 'none';
+    }
+});
+
+// 검색 버튼 클릭
+searchButton.addEventListener('click', function() {
+    const username = searchInput.value.trim();
+    if (username) {
+        loadUserData(username);
+    }
+});
+
+// Enter 키 검색
+searchInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        const username = this.value.trim();
+        if (username) {
+            autocompleteDropdown.style.display = 'none';
+            loadUserData(username);
+        }
+    }
+});
+
+// 사용자 데이터 로드
+function loadUserData(username) {
+    searchResults.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+    
+    fetch(`/api/user-data/${encodeURIComponent(username)}`)
+        .then(res => {
+            if (!res.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return res.json();
+        })
+        .then(data => {
+            console.log('User data:', data);
+            if (!data || data.error) {
+                searchResults.innerHTML = `
+                    <div class="alert alert-warning text-center">
+                        <i class="fas fa-exclamation-triangle"></i> {{t['no_results']}}
+                    </div>
+                `;
+                return;
+            }
+            
+            renderUserData(data);
+        })
+        .catch(err => {
+            searchResults.innerHTML = `
+                <div class="alert alert-danger text-center">
+                    <i class="fas fa-times-circle"></i> 오류가 발생했습니다
+                </div>
+            `;
+        });
+}
+
+// timeframe 정렬 함수
+function sortTimeframes(rankings) {
+    const order = {'7D': 1, '7d': 1, '14D': 2, '14d': 2, '30D': 3, '30d': 3, 'TOTAL': 4, 'total': 4, 'epoch-2': 5, 'epoch_2': 5};
+    return rankings.sort((a, b) => {
+        const aOrder = order[a.timeframe] || 99;
+        const bOrder = order[b.timeframe] || 99;
+        return aOrder - bOrder;
+    });
+}
+
+// 사용자 데이터 렌더링
+function renderUserData(data) {
+    const user = data.user;
+    let html = `
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    ${user.imageUrl ? `
+                        <div class="col-auto">
+                            <img src="${user.imageUrl}" alt="${user.displayName}" 
+                                 style="width: 80px; height: 80px; border-radius: 50%;">
+                        </div>
+                    ` : ''}
+                    <div class="col">
+                        <h3 class="mb-1">
+                            <a href="https://x.com/${user.infoName}" target="_blank" class="text-decoration-none">
+                                ${user.displayName || user.infoName}
+                            </a>
+                        </h3>
+                        <p class="text-muted mb-2">@${user.infoName}</p>
+                        ${user.wal_score ? `<p class="mb-0"><strong>{{t['score']}}:</strong> ${user.wal_score.toLocaleString()}</p>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Cookie 프로젝트
+    if (Object.keys(data.cookie_projects).length > 0) {
+        html += `<div class="project-section">
+            <h4 class="mb-3">🍪 {{t['cookie_projects']}}</h4>
+            <div class="projects-grid">`;
+        
+        Object.keys(data.cookie_projects).sort().forEach(projectName => {
+            const rankings = sortTimeframes(data.cookie_projects[projectName]);
+            
+            // 마쉐 랭킹 (snapsPercent > 0인 경우만)
+            const msRankings = rankings.filter(r => r.msRank && r.snapsPercent > 0);
+            
+            // c마쉐 랭킹 (cSnapsPercent > 0인 경우만)
+            const cmsRankings = rankings.filter(r => r.cmsRank && r.cSnapsPercent > 0);
+            
+            // 둘 다 없으면 카드 자체를 표시하지 않음
+            if (msRankings.length === 0 && cmsRankings.length === 0) {
+                return;
+            }
+            
+            html += `<div class="card project-card">
+                <div class="card-body">
+                    <h5 class="card-title">${projectName.toUpperCase()}</h5>`;
+            
+            if (msRankings.length > 0) {
+                html += `<div class="mb-2"><strong>{{t['mindshare']}}:</strong><br>`;
+                msRankings.forEach(r => {
+                    html += `<span class="timeframe-badge">
+                        ${r.timeframe}: <span class="rank-info">#${r.msRank}</span>
+                        ${r.snapsPercent ? ` (${r.snapsPercent.toFixed(2)}%)` : ''}
+                    </span>`;
+                });
+                html += `</div>`;
+            }
+            
+            if (cmsRankings.length > 0) {
+                html += `<div><strong>{{t['c_mindshare']}}:</strong><br>`;
+                cmsRankings.forEach(r => {
+                    html += `<span class="timeframe-badge">
+                        ${r.timeframe}: <span class="rank-info">#${r.cmsRank}</span>
+                        ${r.cSnapsPercent ? ` (${r.cSnapsPercent.toFixed(2)}%)` : ''}
+                    </span>`;
+                });
+                html += `</div>`;
+            }
+            
+            html += `</div></div>`;
+        });
+        
+        html += `</div></div>`;
+    }
+    
+    // Wallchain 프로젝트
+    if (Object.keys(data.wallchain_projects).length > 0) {
+        html += `<div class="project-section">
+            <h4 class="mb-3">🌊 {{t['wallchain_projects']}}</h4>
+            <div class="projects-grid">`;
+        
+        Object.keys(data.wallchain_projects).sort().forEach(projectName => {
+            const rankings = sortTimeframes(data.wallchain_projects[projectName]);
+            const displayName = projectName.replace('wallchain-', '').toUpperCase();
+            
+            // 순위가 없으면 카드를 표시하지 않음
+            if (rankings.length === 0) {
+                return;
+            }
+            
+            html += `<div class="card project-card wallchain-card">
+                <div class="card-body">
+                    <h5 class="card-title">${displayName}</h5>
+                    <div>`;
+            
+            rankings.forEach(r => {
+                const changeIcon = r.positionChange > 0 ? '↑' : r.positionChange < 0 ? '↓' : '−';
+                const changeColor = r.positionChange > 0 ? 'success' : r.positionChange < 0 ? 'danger' : 'secondary';
+                
+                html += `<span class="timeframe-badge">
+                    ${r.timeframe}: <span class="rank-info">#${r.msRank}</span>
+                    ${r.positionChange !== null ? 
+                        `<span class="position-change text-${changeColor}">(${changeIcon}${Math.abs(r.positionChange)})</span>` 
+                        : ''}
+                </span>`;
+            });
+            
+            html += `</div></div></div>`;
+        });
+        
+        html += `</div></div>`;
+    }
+    
+    searchResults.innerHTML = html;
+    twemoji.parse(document.body);
+}
+</script>
+
+% include('_footer.html')
+</body>
+</html>

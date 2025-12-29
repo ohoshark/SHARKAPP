@@ -2,6 +2,7 @@ from bottle import Bottle, route, run, template, static_file, request, redirect,
 from concurrent.futures import ThreadPoolExecutor  # 상단에 추가
 import os
 import json
+import sqlite3
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,6 +13,8 @@ import time
 from datetime import datetime
 from data_processor import DataProcessor
 from data_processor_wallchain import DataProcessorWallchain
+from unified_data_manager import UnifiedDataManager
+import schedule
 
 app = Bottle()
 
@@ -27,6 +30,9 @@ project_instances = {}  # Cookie 프로젝트
 wallchain_instances = {}  # Wallchain 프로젝트
 # main.py 파일 상단에 로그 파일 경로 설정
 LOG_FILE = 'access_log.txt'
+
+# 통합 데이터 관리자 초기화
+unified_manager = UnifiedDataManager()
 
 # main.py 파일 내 log_access 함수를 아래와 같이 수정
 PROJECT_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
@@ -351,6 +357,178 @@ def favicon():
     # print("--- DEBUG: Favicon 라우트 호출됨 ---")
     return static_file('favicon.ico', root='./static')
 
+# ===================== UNIFIED DATA MANAGEMENT =====================
+
+def update_unified_rankings():
+    """통합 DB 갱신 - 모든 프로젝트의 최신 순위 정보 수집"""
+    print(f"\n{'='*60}")
+    print(f"[통합 DB 갱신 시작] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*60}")
+    
+    try:
+        # 배치 업데이트 시작 (임시 테이블 생성)
+        unified_manager.begin_batch_update()
+        
+        # 메모리에 데이터 수집
+        users_batch = {}  # {infoName: (infoName, displayName, imageUrl, wal_score)}
+        rankings_batch = []  # [(infoName, projectName, timeframe, ...)]
+        
+        # Cookie 프로젝트 데이터 수집
+        for project_name, dp in project_instances.items():
+            try:
+                print(f"[Cookie] {project_name} 처리 중...")
+                
+                for timeframe in dp.timeframes:
+                    # 최신 타임스탬프의 데이터 가져오기
+                    with sqlite3.connect(dp.db_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "SELECT MAX(timestamp) FROM snaps WHERE timeframe = ?",
+                            (timeframe,)
+                        )
+                        latest_ts = cursor.fetchone()[0]
+                        
+                        if not latest_ts:
+                            continue
+                        
+                        # 해당 타임스탬프의 모든 유저 데이터
+                        cursor.execute('''
+                            SELECT username, displayName, profileImageUrl, 
+                                   snapsRank, cSnapsRank, snapsPercent, cSnapsPercent
+                            FROM snaps 
+                            WHERE timestamp = ? AND timeframe = ?
+                        ''', (latest_ts, timeframe))
+                        
+                        rows = cursor.fetchall()
+                        
+                        for row in rows:
+                            username = row[0]
+                            display_name = row[1]
+                            image_url = row[2]
+                            snaps_rank = row[3]
+                            c_snaps_rank = row[4]
+                            snaps_percent = row[5]
+                            c_snaps_percent = row[6]
+                            
+                            # 유저 정보 수집 (wallchain 우선이므로 없을 때만)
+                            if username not in users_batch:
+                                users_batch[username] = (username, display_name, image_url, None)
+                            
+                            # 순위 정보 수집
+                            rankings_batch.append((
+                                username, project_name, timeframe, 
+                                snaps_rank, c_snaps_rank, snaps_percent, c_snaps_percent, None
+                            ))
+                
+                print(f"[Cookie] {project_name} 완료 ✓")
+                
+            except Exception as e:
+                print(f"[Cookie] {project_name} 오류: {e}")
+        
+        # Wallchain 프로젝트 데이터 수집
+        for project_name, dp in wallchain_instances.items():
+            try:
+                print(f"[Wallchain] {project_name} 처리 중...")
+                
+                for timeframe in dp.timeframes:
+                    # 최신 타임스탬프의 데이터 가져오기
+                    with sqlite3.connect(dp.db_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "SELECT MAX(timestamp) FROM leaderboard WHERE timeframe = ?",
+                            (timeframe,)
+                        )
+                        latest_ts = cursor.fetchone()[0]
+                        
+                        if not latest_ts:
+                            continue
+                        
+                        # 해당 타임스탬프의 모든 유저 데이터
+                        cursor.execute('''
+                            SELECT username, name, imageUrl, score, 
+                                   position, positionChange
+                            FROM leaderboard 
+                            WHERE timestamp = ? AND timeframe = ?
+                        ''', (latest_ts, timeframe))
+                        
+                        rows = cursor.fetchall()
+                        
+                        for row in rows:
+                            name = row[0]  # wallchain의 username
+                            username = row[1]  # wallchain의 name (실제 handle)
+                            image_url = row[2]
+                            score = row[3]
+                            position = row[4]
+                            position_change = row[5]
+                            
+                            # 유저 정보 수집 (wallchain 우선 - 덮어쓰기)
+                            users_batch[name] = (name, username, image_url, score)
+                            
+                            # 순위 정보 수집
+                            rankings_batch.append((
+                                name, project_name, timeframe,
+                                position, None, None, None, position_change
+                            ))
+                
+                print(f"[Wallchain] {project_name} 완료 ✓")
+                
+            except Exception as e:
+                print(f"[Wallchain] {project_name} 오류: {e}")
+        
+        # 배치 삽입
+        print(f"[통합 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
+        unified_manager.batch_insert_users(list(users_batch.values()))
+        unified_manager.batch_insert_rankings(rankings_batch)
+        
+        # 원자적 교체
+        unified_manager.commit_batch_update()
+        
+        print(f"\n{'='*60}")
+        print(f"[통합 DB 갱신 완료] {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{'='*60}\n")
+        
+    except Exception as e:
+        print(f"[통합 DB 갱신 실패] {e}")
+        import traceback
+        traceback.print_exc()
+
+def schedule_unified_updates():
+    """매 시간 15분에 통합 DB 갱신 스케줄링"""
+    schedule.every().hour.at(":15").do(update_unified_rankings)
+    
+    # DB가 비어있으면 즉시 갱신, 아니면 5분 후 갱신
+    def initial_update():
+        try:
+            # 데이터베이스에 데이터가 있는지 확인
+            conn = sqlite3.connect('unified_rankings.db')
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) FROM users')
+            count = cursor.fetchone()[0]
+            conn.close()
+            
+            if count == 0:
+                print("[통합 DB] 데이터가 없음 - 즉시 갱신 시작")
+                update_unified_rankings()
+            else:
+                print(f"[통합 DB] 기존 데이터 {count}개 확인 - 5분 후 갱신 예정")
+                time.sleep(300)  # 5분 대기
+                update_unified_rankings()
+        except Exception as e:
+            print(f"[통합 DB 초기화 오류] {e}")
+            # 오류 발생 시 즉시 갱신 시도
+            update_unified_rankings()
+    
+    threading.Thread(target=initial_update, daemon=True).start()
+    
+    # 스케줄러 실행
+    def run_scheduler():
+        while True:
+            schedule.run_pending()
+            time.sleep(30)
+    
+    threading.Thread(target=run_scheduler, daemon=True).start()
+    print("[통합 DB 스케줄러] 매 시간 15분 갱신으로 설정됨")
+
 @app.route('/ref')
 @app.route('/')
 def home_redirect():
@@ -401,6 +579,65 @@ def get_language():
     쿠키에서 언어 설정을 가져옴 (기본값 'ko')
     """
     return request.get_cookie('lang', 'ko')
+
+# ===================== UNIFIED SEARCH ROUTES =====================
+
+@app.route('/user-lookup')
+def user_lookup_page():
+    """통합 검색 페이지"""
+    log_access('user_lookup', 'unified')
+    lang = get_language()
+    
+    all_projects = get_cached_projects()
+    all_wallchain_projects = get_cached_wallchain_projects()
+    grouped_projects = get_grouped_projects()
+    grouped_wallchain = get_grouped_wallchain_projects()
+    
+    # 현재 페이지를 'unified'로 설정하여 네비게이션에서 표시
+    return template('user_lookup.html',
+                   lang=lang,
+                   current_page='user_lookup',
+                   project='unified',
+                   all_projects=all_projects,
+                   all_wallchain_projects=all_wallchain_projects,
+                   grouped_projects=grouped_projects,
+                   grouped_wallchain=grouped_wallchain,
+                   t={})
+
+@app.route('/api/user-search')
+def api_user_search():
+    """유저 검색 자동완성 API"""
+    response.content_type = 'application/json'
+    query = request.query.get('q', '').strip()
+    
+    if len(query) < 2:
+        return json.dumps([])
+    
+    try:
+        results = unified_manager.search_users(query, limit=10)
+        return json.dumps(results)
+    except Exception as e:
+        print(f"[API Error] user-search: {e}")
+        return json.dumps([])
+
+@app.route('/api/user-data/<username>')
+def api_user_data(username):
+    """특정 유저의 전체 데이터 API"""
+    response.content_type = 'application/json'
+    
+    try:
+        data = unified_manager.get_user_data(username)
+        
+        if not data:
+            return json.dumps({'error': 'User not found'})
+        
+        return json.dumps(data)
+    except Exception as e:
+        print(f"[API Error] user-data: {e}")
+        return json.dumps({'error': str(e)})
+
+# ===================== END UNIFIED ROUTES =====================
+
 @app.route('/leaderboard')
 @app.route('/leaderboard/')
 @app.route('/compare')
@@ -1447,6 +1684,10 @@ if __name__ == '__main__':
     wallchain_init_thread = threading.Thread(target=init_wallchain_on_startup, daemon=True)
     wallchain_init_thread.start()
     print("🌊 Wallchain 프로젝트 초기화를 백그라운드에서 진행합니다...")
+    
+    # 3. 통합 DB 갱신 스케줄러 시작
+    schedule_unified_updates()
+    print("🔄 통합 DB 갱신 스케줄러가 시작되었습니다...")
     
     print("\n" + "="*60)
     print("🌐 Waitress Server Running on http://0.0.0.0:8080")
