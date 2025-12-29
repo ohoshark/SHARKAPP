@@ -15,11 +15,11 @@
                     %>
                     {{current_flag}} {{current_name}}
                 </button>
-                <ul class="dropdown-menu shadow border-0" style="padding: 5px; background-color: rgba(255,255,255,0.6); backdrop-filter: blur(6px);" aria-labelledby="projectDropdown">
+                <ul class="dropdown-menu shadow border-0" style="padding: 5px; background-color: rgba(255,255,255,0.6); backdrop-filter: blur(6px); margin-left: -50px;" aria-labelledby="projectDropdown">
                     % if grouped_wallchain:
                         <li>
                             <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🦆 Wallchain Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="wallchainProjectsCollapse">
@@ -67,7 +67,7 @@
                         % end
                         <li>
                             <a class="dropdown-header text-primary fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cookieProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🍪 Cookie Projects <i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🍪 Cookie<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="cookieProjectsCollapse">
@@ -121,7 +121,7 @@
                 <%
                     # 현재 페이지가 wallchain인지, 통합 검색인지 확인
                     is_wallchain = get('is_wallchain', False)
-                    is_unified = (project == 'unified' or current_page == 'user_lookup')
+                    is_unified = (project == 'SEARCH' or current_page == 'user_lookup')
                     
                     if not is_unified:
                         base_url = f"/wallchain/{project}" if is_wallchain else f"/cookie/{project}"
@@ -137,7 +137,7 @@
                 % end
                 <li class="nav-item">
                     <a class="nav-link {{'active' if current_page == 'user_lookup' else ''}}" href="/user-lookup">
-                        <i class="fas fa-search"></i> {{'통합 검색' if lang == 'ko' else 'Unified Search'}}
+                        <i class="fas fa-search"></i> {{'통합 검색' if lang == 'ko' else 'Global Search'}}
                     </a>
                 </li>
             </ul>

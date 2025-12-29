@@ -4,7 +4,7 @@ from datetime import datetime
 import logging
 
 class UnifiedDataManager:
-    def __init__(self, db_path='./unified_rankings.db'):
+    def __init__(self, db_path='./data/unified_rankings.db'):
         self.db_path = db_path
         self.init_database()
     

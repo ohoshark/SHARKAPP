@@ -501,7 +501,7 @@ def schedule_unified_updates():
     def initial_update():
         try:
             # 데이터베이스에 데이터가 있는지 확인
-            conn = sqlite3.connect('unified_rankings.db')
+            conn = sqlite3.connect('./data/unified_rankings.db')
             cursor = conn.cursor()
             cursor.execute('SELECT COUNT(*) FROM users')
             count = cursor.fetchone()[0]
