@@ -423,11 +423,41 @@ function loadUserData(username) {
 
 // timeframe 정렬 함수
 function sortTimeframes(rankings) {
-    const order = {'7D': 1, '7d': 1, '14D': 2, '14d': 2, '30D': 3, '30d': 3, 'TOTAL': 4, 'total': 4, 'epoch-2': 5, 'epoch_2': 5};
+    // 기본 우선순위 (알려진 패턴)
+    const knownOrder = {
+        '7D': 1, '7d': 1, 
+        '14D': 2, '14d': 2, 
+        '30D': 3, '30d': 3, 
+        'TOTAL': 4, 'total': 4
+    };
+    
     return rankings.sort((a, b) => {
-        const aOrder = order[a.timeframe] || 99;
-        const bOrder = order[b.timeframe] || 99;
-        return aOrder - bOrder;
+        const tfA = a.timeframe;
+        const tfB = b.timeframe;
+        
+        // 알려진 순서가 있으면 사용
+        const aOrder = knownOrder[tfA];
+        const bOrder = knownOrder[tfB];
+        
+        if (aOrder !== undefined && bOrder !== undefined) {
+            return aOrder - bOrder;
+        }
+        if (aOrder !== undefined) return -1;  // A가 알려진 순서면 먼저
+        if (bOrder !== undefined) return 1;   // B가 알려진 순서면 먼저
+        
+        // 둘 다 알려지지 않은 경우: epoch 패턴 처리
+        const isEpochA = tfA.toLowerCase().startsWith('epoch');
+        const isEpochB = tfB.toLowerCase().startsWith('epoch');
+        
+        if (isEpochA && isEpochB) {
+            // 둘 다 epoch인 경우 문자열 비교 (epoch-2, epoch-omega 등)
+            return tfA.localeCompare(tfB);
+        }
+        if (isEpochA) return 1;  // epoch는 뒤로
+        if (isEpochB) return -1; // epoch는 뒤로
+        
+        // 나머지는 알파벳 순
+        return tfA.localeCompare(tfB);
     });
 }
 

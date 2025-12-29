@@ -11,7 +11,10 @@ from collections import defaultdict
 class DataProcessorWallchain:
     def __init__(self, data_dir):
         self.data_dir = data_dir
-        self.timeframes = ['7d', '30d', 'epoch-2']
+        
+        # 동적으로 timeframe 감지
+        self.timeframes = self._detect_timeframes()
+        
         # DB 파일 경로 설정
         self.db_path = os.path.join(data_dir, "wallchain_data.db")
         
@@ -21,10 +24,28 @@ class DataProcessorWallchain:
         # 2. 최신 파일 정보 로드
         self.latest_file = self._load_latest_file_info()
 
+    def _detect_timeframes(self):
+        """data_dir 내의 실제 폴더를 스캔하여 timeframe 목록 생성"""
+        timeframes = []
+        if os.path.exists(self.data_dir):
+            for item in os.listdir(self.data_dir):
+                item_path = os.path.join(self.data_dir, item)
+                # 폴더이고, 숨김 폴더가 아니며, .db 파일이 아닌 경우
+                if os.path.isdir(item_path) and not item.startswith('_') and not item.startswith('.'):
+                    # epoch_2 같은 언더스코어 형식을 하이픈으로 정규화
+                    normalized = self.normalize_timeframe(item)
+                    timeframes.append(normalized)
+                    # print(f"[Wallchain] Detected timeframe: {item} -> {normalized}")
+        
+        result = sorted(timeframes) if timeframes else ['7d', '30d', 'epoch-2']
+        # print(f"[Wallchain] Final timeframes for {self.data_dir}: {result}")
+        return result
+
     def normalize_timeframe(self, timeframe):
-        """timeframe 명칭을 정규화 (epoch_2 -> epoch-2)"""
-        if timeframe == 'epoch_2':
-            return 'epoch-2'
+        """timeframe 명칭을 정규화 (epoch_2 -> epoch-2, epoch_omega 유지)"""
+        # epoch_숫자 형식만 하이픈으로 변경
+        if timeframe.startswith('epoch_') and timeframe.split('_')[1].isdigit():
+            return timeframe.replace('_', '-')
         return timeframe
 
     def _init_db(self):
@@ -165,32 +186,38 @@ class DataProcessorWallchain:
         print(f"--- [Wallchain - {self.data_dir}] 안전한 파일 정리 시작 ---")
         
         for tf in self.timeframes:
-            # 가능한 모든 폴더 경로 확인 (epoch-2의 경우 epoch_2도 포함)
-            possible_paths = [os.path.join(self.data_dir, tf)]
-            if tf == 'epoch-2':
-                possible_paths.append(os.path.join(self.data_dir, 'epoch_2'))
+            # 원본 폴더명 찾기 (정규화 전)
+            original_folder = None
+            for item in os.listdir(self.data_dir):
+                item_path = os.path.join(self.data_dir, item)
+                if os.path.isdir(item_path) and self.normalize_timeframe(item) == tf:
+                    original_folder = item
+                    break
             
-            for path in possible_paths:
-                if not os.path.exists(path):
-                    continue
+            if not original_folder:
+                continue
+            
+            path = os.path.join(self.data_dir, original_folder)
+            if not os.path.exists(path):
+                continue
+            
+            # DB가 기억하는 이 타임프레임의 최신 파일명 (기준점)
+            latest_filename = self.latest_file.get(tf, "")
+            if not latest_filename:
+                continue
+            
+            # 폴더 내 모든 json 파일 리스트업
+            all_files = glob.glob(os.path.join(path, "*.json"))
+            
+            for f_path in all_files:
+                f_name = os.path.basename(f_path)
                 
-                # DB가 기억하는 이 타임프레임의 최신 파일명 (기준점)
-                latest_filename = self.latest_file.get(tf, "")
-                if not latest_filename:
-                    continue
-                
-                # 폴더 내 모든 json 파일 리스트업
-                all_files = glob.glob(os.path.join(path, "*.json"))
-                
-                for f_path in all_files:
-                    f_name = os.path.basename(f_path)
-                    
-                    # '기준이 되는 최신 파일'보다 이름(시간)이 작은 파일만 삭제
-                    if f_name < latest_filename:
-                        try:
-                            os.remove(f_path)
-                            print(f"Deleted old file: {f_name} from {os.path.basename(path)}")
-                        except Exception as e:
+                # '기준이 되는 최신 파일'보다 이름(시간)이 작은 파일만 삭제
+                if f_name < latest_filename:
+                    try:
+                        os.remove(f_path)
+                        print(f"Deleted old file: {f_name} from {original_folder}")
+                    except Exception as e:
                             print(f"Failed to delete {f_name}: {e}")
 
     def check_for_new_data(self):
@@ -198,22 +225,34 @@ class DataProcessorWallchain:
         new_files = defaultdict(list)
         any_new = False
         
+        # 실제 폴더를 다시 스캔하여 새로운 timeframe도 감지
+        current_timeframes = self._detect_timeframes()
+        if current_timeframes != self.timeframes:
+            # print(f"[Wallchain] 새로운 timeframe 감지: {set(current_timeframes) - set(self.timeframes)}")
+            self.timeframes = current_timeframes
+        
         for tf in self.timeframes:
-            # 가능한 모든 폴더 경로 확인 (epoch-2의 경우 epoch_2도 포함)
-            possible_paths = [os.path.join(self.data_dir, tf)]
-            if tf == 'epoch-2':
-                possible_paths.append(os.path.join(self.data_dir, 'epoch_2'))
+            # 원본 폴더명 찾기 (정규화 전)
+            original_folder = None
+            for item in os.listdir(self.data_dir):
+                item_path = os.path.join(self.data_dir, item)
+                if os.path.isdir(item_path) and self.normalize_timeframe(item) == tf:
+                    original_folder = item
+                    break
             
-            for path in possible_paths:
-                if not os.path.exists(path):
-                    continue
-                
-                all_files = sorted(glob.glob(os.path.join(path, "*.json")))
-                last_loaded = self.latest_file.get(tf, "")
-                for f in all_files:
-                    if os.path.basename(f) > last_loaded:
-                        new_files[tf].append(f)
-                        any_new = True
+            if not original_folder:
+                continue
+            
+            path = os.path.join(self.data_dir, original_folder)
+            if not os.path.exists(path):
+                continue
+            
+            all_files = sorted(glob.glob(os.path.join(path, "*.json")))
+            last_loaded = self.latest_file.get(tf, "")
+            for f in all_files:
+                if os.path.basename(f) > last_loaded:
+                    new_files[tf].append(f)
+                    any_new = True
         return new_files if any_new else {}
 
     # --- 데이터 조회 함수들 ---

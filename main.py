@@ -1364,21 +1364,41 @@ def wallchain_index(projectname):
             if timestamps_check:
                 timeframe = requested_timeframe
         
-        # 요청된 timeframe이 없거나 데이터가 없으면 우선순위에 따라 선택
+        # 요청된 timeframe이 없거나 데이터가 없으면 사용 가능한 timeframe 중 선택
         if not timeframe:
-            for tf in ['epoch-2', '30d', '7d']:
-                if tf in dp.timeframes:
-                    timestamps_check = dp.get_available_timestamps(tf)
-                    if timestamps_check:
-                        timeframe = tf
-                        break
+            # dp.timeframes에서 데이터가 있는 마지막 timeframe 선택
+            for tf in reversed(dp.timeframes):
+                timestamps_check = dp.get_available_timestamps(tf)
+                if timestamps_check:
+                    timeframe = tf
+                    break
         
-        # 그래도 없으면 첫 번째 timeframe 사용
+        # 그래도 없으면 마지막 timeframe 사용
         if not timeframe:
-            timeframe = dp.timeframes[0] if dp.timeframes else '7d'
+            timeframe = dp.timeframes[-1] if dp.timeframes else '7d'
         
         # 모든 timeframe에서 사용자 검색 (중복 제거)
         all_users = dp.get_all_usernames_from_all_timeframes()
+        
+        # 데이터가 있는 timeframe만 필터링
+        available_timeframes = []
+        for tf in dp.timeframes:
+            timestamps_check = dp.get_available_timestamps(tf)
+            if timestamps_check:
+                available_timeframes.append(tf)
+        
+        # timeframe 정렬: 7d, 30d, 나머지는 알파벳 순
+        def sort_timeframes(tf):
+            tf_lower = tf.lower()
+            if tf_lower == '7d':
+                return (0, tf)
+            elif tf_lower == '30d':
+                return (1, tf)
+            else:
+                return (2, tf)
+        
+        available_timeframes.sort(key=sort_timeframes)
+        
         all_wallchain_projects = get_cached_wallchain_projects()
         all_cookie_projects = get_cached_projects()
         grouped_projects = get_grouped_projects()
@@ -1397,7 +1417,7 @@ def wallchain_index(projectname):
                        grouped_wallchain=grouped_wallchain,
                        all_users=all_users,
                        timeframe=timeframe,
-                       timeframes=dp.timeframes)
+                       timeframes=available_timeframes)
     except ValueError as e:
         return render_error(str(e), projectname)
 
@@ -1426,18 +1446,18 @@ def wallchain_leaderboard(projectname):
             if timestamps_check:
                 timeframe = requested_timeframe
         
-        # 요청된 timeframe이 없거나 데이터가 없으면 우선순위에 따라 선택
+        # 요청된 timeframe이 없거나 데이터가 없으면 사용 가능한 timeframe 중 선택
         if not timeframe:
-            for tf in ['epoch-2', '30d', '7d']:
-                if tf in dp.timeframes:
-                    timestamps_check = dp.get_available_timestamps(tf)
-                    if timestamps_check:
-                        timeframe = tf
-                        break
+            # dp.timeframes에서 데이터가 있는 마지막 timeframe 선택
+            for tf in reversed(dp.timeframes):
+                timestamps_check = dp.get_available_timestamps(tf)
+                if timestamps_check:
+                    timeframe = tf
+                    break
         
-        # 그래도 없으면 첫 번째 timeframe 사용
+        # 그래도 없으면 마지막 timeframe 사용
         if not timeframe:
-            timeframe = dp.timeframes[0] if dp.timeframes else '7d'
+            timeframe = dp.timeframes[-1] if dp.timeframes else '7d'
         
         timestamp1 = request.query.get('timestamp1', '')
         timestamp2 = request.query.get('timestamp2', '')
@@ -1562,6 +1582,18 @@ def wallchain_leaderboard(projectname):
             if timestamps_check:
                 available_timeframes.append(tf)
         
+        # timeframe 정렬: 7d, 30d, 나머지는 알파벳 순
+        def sort_timeframes(tf):
+            tf_lower = tf.lower()
+            if tf_lower == '7d':
+                return (0, tf)
+            elif tf_lower == '30d':
+                return (1, tf)
+            else:
+                return (2, tf)
+        
+        available_timeframes.sort(key=sort_timeframes)
+        
         all_wallchain_projects = get_cached_wallchain_projects()
         all_cookie_projects = get_cached_projects()
         grouped_projects = get_grouped_projects()
@@ -1606,12 +1638,12 @@ def wallchain_user_analysis(projectname, username):
         # 사용 가능한 timeframe 중 실제 데이터가 있는 것을 선택
         timeframe = None
         
-        for tf in ['epoch-2', '30d', '7d']:
-            if tf in dp.timeframes:
-                timestamps_check = dp.get_available_timestamps(tf)
-                if timestamps_check:
-                    timeframe = tf
-                    break
+        # dp.timeframes에서 데이터가 있는 첫 번째 timeframe 선택
+        for tf in dp.timeframes:
+            timestamps_check = dp.get_available_timestamps(tf)
+            if timestamps_check:
+                timeframe = tf
+                break
         
         # 그래도 없으면 첫 번째 timeframe 사용
         if not timeframe:
@@ -1634,6 +1666,18 @@ def wallchain_user_analysis(projectname, username):
             data = user_data.get(tf, pd.DataFrame())
             if not data.empty:
                 available_timeframes.append(tf)
+        
+        # timeframe 정렬: 7d, 30d, 나머지는 알파벳 순
+        def sort_timeframes(tf):
+            tf_lower = tf.lower()
+            if tf_lower == '7d':
+                return (0, tf)
+            elif tf_lower == '30d':
+                return (1, tf)
+            else:
+                return (2, tf)
+        
+        available_timeframes.sort(key=sort_timeframes)
         
         # 데이터가 있는 차트만 생성
         if not available_timeframes:
