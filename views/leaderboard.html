@@ -78,7 +78,34 @@
 	<script src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 	<link rel="stylesheet" href="/static/css/leaderboard.css">
 	<style>
-			@media (max-width: 767.98px) {
+		/* DataTables 페이징 컨트롤 스타일 통일 */
+		.dataTables_wrapper .dataTables_length select {
+			padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+			border: 1px solid #dee2e6;
+			border-radius: 0.25rem;
+			background-color: #fff;
+			font-size: 1rem;
+			line-height: 1.5;
+			margin-top: 3px;
+		}
+		
+		.dataTables_wrapper .dataTables_length,
+		.dataTables_wrapper .dataTables_paginate {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0.5rem 0;
+		}
+		
+		.dataTables_wrapper .dataTables_length {
+			justify-content: flex-start;
+		}
+		
+		.dataTables_wrapper .dataTables_paginate {
+			justify-content: flex-end;
+		}
+		
+		@media (max-width: 767.98px) {
 			.table-responsive td:nth-of-type(1):before { content: "{{t['user']}}"; }
 		.table-responsive td:nth-of-type(2):before { content: "{{t['prev_point']}}"; }
 		.table-responsive td:nth-of-type(3):before { content: "{{t['curr_point']}}"; }
@@ -87,6 +114,11 @@
 		.table-responsive td:nth-of-type(6):before { content: "{{t['cur']}} {{_col_metric}}{{t['ms']}}"; } 
 		.table-responsive td:nth-of-type(7):before { content: "{{_col_metric}}{{t['ms']}} {{t['change']}}"; } 
 		
+			/* 모바일에서 페이징 컨트롤 간격 조정 */
+			.dataTables_wrapper .dataTables_length,
+			.dataTables_wrapper .dataTables_paginate {
+				padding: 0.5rem 0.25rem;
+			}
 			}
 	</style>
 </head>
@@ -284,13 +316,27 @@
 	
 	if ($tableElement.length > 0) {
 		table = $tableElement.DataTable({
-			"paging": false,
-			"info": false,
+			"dom": "<'row'<'col-6 col-md-6'l><'col-6 col-md-6'p>>" +
+				   "<'row'<'col-sm-12'tr>>" +
+				   "<'row'<'col-sm-12 text-center'i>>",
+			"paging": true,
+			"pageLength": 300,
+			"lengthMenu": [[100, 300, 500, -1], [100, 300, 500, "All"]],
+			"info": true,
 			"ordering": true,
 			"searching": false,
 			"language": {
 				"emptyTable": "비교할 데이터가 없습니다.",
-				"zeroRecords": "일치하는 데이터가 없습니다."
+				"zeroRecords": "일치하는 데이터가 없습니다.",
+				"info": "",
+				"infoEmpty": "0개 항목",
+				"lengthMenu": "_MENU_",
+				"paginate": {
+					"first": "<<",
+					"last": ">>",
+					"next": ">",
+					"previous": "<"
+				}
 			},
 			"order": [[2, 'asc']], 
 			"columnDefs": [
@@ -409,21 +455,21 @@ function searchUsers(query) {
 $searchResults.on('click', 'a.list-group-item-action', function(e) {
     e.preventDefault();
     const usernameToFind = $(this).data('username');
-    let $targetRow = null;
+    let targetRowIndex = null;
 
+    // 전체 행에서 해당 사용자 찾기
     table.rows().every(function() {
         const rowData = this.data();
         const cellText = $('<div>' + rowData[0] + '</div>').text().trim(); 
         if (cellText === usernameToFind) {
-            $targetRow = $(this.node()); 
+            targetRowIndex = this.index();
             return false; 
         }
     });
 
-    if ($targetRow && $targetRow.length) {
-        searchModal.hide(); // 모달 닫기
+    if (targetRowIndex !== null) {
+        searchModal.hide();
         
-        // Backdrop 강제 제거 및 스크롤 복구
         setTimeout(function() {
             $('.modal-backdrop').remove();
             $('body').removeClass('modal-open');
@@ -431,15 +477,30 @@ $searchResults.on('click', 'a.list-group-item-action', function(e) {
         }, 100);
         
         setTimeout(function() {
-            $('html, body').animate({
-                scrollTop: $targetRow.offset().top - 150 
-            }, 500);
-
-            $targetRow.addClass('table-warning'); // 부트스트랩 클래스 활용
+            // 해당 행이 있는 페이지로 이동
+            const pageInfo = table.page.info();
+            const pageSize = pageInfo.length;
+            const targetPage = Math.floor(targetRowIndex / pageSize);
+            
+            // 페이지 이동 (false = 페이지 번호 리셋 안 함)
+            table.page(targetPage).draw(false);
+            
+            // 페이지 이동 후 DOM이 업데이트되면 스크롤
             setTimeout(function() {
-                $targetRow.removeClass('table-warning');
-            }, 2000);
-        }, 300); // 모달이 닫히는 애니메이션 시간 확보
+                const $targetRow = $(table.row(targetRowIndex).node());
+                
+                if ($targetRow && $targetRow.length) {
+                    $('html, body').animate({
+                        scrollTop: $targetRow.offset().top - 150 
+                    }, 500);
+
+                    $targetRow.addClass('table-warning');
+                    setTimeout(function() {
+                        $targetRow.removeClass('table-warning');
+                    }, 2000);
+                }
+            }, 100);
+        }, 300);
     }
 });
 
