@@ -1,0 +1,218 @@
+/* 검색 컨테이너는 좌측 정렬, 최대 50% 너비 */
+.search-container {
+    max-width: 50%;
+    margin: 0;
+}
+
+@media (max-width: 992px) {
+    .search-container {
+        max-width: 100%;
+    }
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 0.25rem 0.25rem;
+    max-height: 300px;
+    overflow-y: auto;
+    width: 100%;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: none;
+}
+
+.autocomplete-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.active {
+    background-color: #f8f9fa;
+}
+
+.autocomplete-item img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.project-section {
+    margin-top: 30px;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.project-card {
+    margin-bottom: 0;
+    border-left: 4px solid #007bff;
+    height: 100%;
+    position: relative;
+}
+
+.user-detail-link {
+    position: absolute;
+    top: 45px;
+    right: 0px;
+    width: 32px;
+    height: 32px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.project-type-icon {
+    position: absolute;
+    top: -15px;
+    left: -15px;
+    width: 48px;
+    height: 48px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    z-index: 10;
+}
+
+.project-type-icon.wallchain {
+    top: -15px;
+    left: -15px;
+    width: 48px;
+    height: 48px;
+    font-size: 2.2rem;
+}
+
+.user-detail-link:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+}
+
+.wallchain-card {
+    border-left-color: #17a2b8;
+}
+
+.project-card .card-title {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: #fff;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 10px 15px;
+    border-radius: 5px;
+    text-align: left;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.project-card .card-title .flag-emoji {
+    background: white;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    line-height: 1;
+}
+
+html.dark-mode .project-card .card-title .flag-emoji {
+    background: #a8a8a8;
+}
+
+html.dark-mode .project-type-icon {
+    background: #a8a8a8;
+}
+
+html.dark-mode .user-detail-link {
+    background: #a8a8a8;
+    color: #b8b8b8;
+}
+
+.wallchain-card .card-title {
+    background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+}
+
+.timeframe-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    align-items: start;
+}
+
+.timeframe-badge {
+    display: grid;
+    grid-template-columns: 45px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 10px;
+    margin: 0;
+    background: #f8f9fa;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.timeframe-label {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+/* 다크모드 timeframe 스타일 */
+html.dark-mode .timeframe-badge {
+    background: #3d3d3d;
+}
+
+html.dark-mode .timeframe-label {
+    color: #b8b8b8;
+    font-weight: 700;
+}
+
+.rank-info {
+    font-weight: bold;
+    color: #007bff;
+    text-align: center;
+}
+
+.percent-info {
+    color: #28a745;
+    text-align: right;
+    font-weight: 700;
+}
+
+.position-change {
+    font-size: 0.8rem;
+    color: #6c757d;
+}

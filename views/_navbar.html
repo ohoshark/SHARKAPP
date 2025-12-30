@@ -19,7 +19,7 @@
                     % if grouped_wallchain:
                         <li>
                             <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="wallchainProjectsCollapse">
@@ -71,7 +71,7 @@
                         % end
                         <li>
                             <a class="dropdown-header text-primary fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cookieProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;background-color:#f7fbff;">🍪 Cookie<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🍪 Cookie<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="cookieProjectsCollapse">
@@ -150,13 +150,18 @@
                 </li>
             </ul>
                     
-            <div class="creator-badge me-2 text-end text-lg-start" data-bs-toggle="modal" data-bs-target="#creatorModal">
-                <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
-                <span>Created by ohoshark</span>
-            </div>
-            <div class="btn-group btn-group-sm me-3 d-flex justify-content-end justify-content-lg-start">
-                <a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
-                <a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
+            <div class="d-flex align-items-center justify-content-end justify-content-lg-start gap-2">
+                <div class="creator-badge me-0" data-bs-toggle="modal" data-bs-target="#creatorModal">
+                    <img src="/static/ohoshark.png" style="flex-shrink: 0;" alt="ohoshark">
+                    <span>Created by ohoshark</span>
+                </div>
+                <div class="btn-group btn-group-sm">
+                    <a href="/set_lang/ko" class="btn btn-outline-secondary {{'active' if lang == 'ko' else ''}}">KO</a>
+                    <a href="/set_lang/en" class="btn btn-outline-secondary {{'active' if lang == 'en' else ''}}">EN</a>
+                </div>
+                <button id="themeToggle" class="btn btn-outline-secondary btn-sm d-flex align-items-center justify-content-center" style="width: 40px; height: 32px;" title="Toggle theme">
+                    <i class="fas fa-moon" id="themeIcon"></i>
+                </button>
             </div>
         </div>
     </div>
