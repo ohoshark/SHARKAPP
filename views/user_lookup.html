@@ -514,11 +514,11 @@ function renderUserData(data) {
         </div>
     `;
     
+    // 모든 프로젝트를 하나의 그리드에 표시
+    html += `<div class="projects-grid">`;
+    
     // Cookie 프로젝트
     if (Object.keys(data.cookie_projects).length > 0) {
-        html += `<div class="project-section">
-            <div class="projects-grid">`;
-        
         Object.keys(data.cookie_projects).sort().forEach(projectName => {
             const rankings = sortTimeframes(data.cookie_projects[projectName]);
             
@@ -570,15 +570,10 @@ function renderUserData(data) {
                 html += `</div></div></div>`;
             }
         });
-        
-        html += `</div></div>`;
     }
     
     // Wallchain 프로젝트
     if (Object.keys(data.wallchain_projects).length > 0) {
-        html += `<div class="project-section">
-            <div class="projects-grid">`;
-        
         Object.keys(data.wallchain_projects).sort().forEach(projectName => {
             const rankings = sortTimeframes(data.wallchain_projects[projectName]);
             const projectShortName = projectName.replace('wallchain-', '');
@@ -619,8 +614,13 @@ function renderUserData(data) {
             
             html += `</div></div></div>`;
         });
-        
-        html += `</div></div>`;
+    }
+    
+    // 그리드 닫기
+    html += `</div>`;
+    
+    if (Object.keys(data.cookie_projects).length === 0 && Object.keys(data.wallchain_projects).length === 0) {
+        html += `<div class="alert alert-info">이 사용자는 어떤 프로젝트에도 없습니다.</div>`;
     }
     
     searchResults.innerHTML = html;
