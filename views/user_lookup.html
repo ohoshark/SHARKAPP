@@ -37,9 +37,16 @@
 <html lang="{{lang}}">
 % include('_head.html')
 <style>
+    /* 검색 컨테이너는 좌측 정렬, 최대 50% 너비 */
     .search-container {
-        max-width: 800px;
-        margin: 0 auto;
+        max-width: 50%;
+        margin: 0;
+    }
+    
+    @media (max-width: 992px) {
+        .search-container {
+            max-width: 100%;
+        }
     }
     
     .autocomplete-dropdown {
@@ -82,8 +89,8 @@
     
     .projects-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: 15px;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 12px;
         margin-bottom: 20px;
     }
     
@@ -232,7 +239,6 @@
 
 <div class="container mt-2">
     <div class="search-container">
-        
         <div class="card shadow-sm mb-1">
             <div class="card-body">
                 <div class="position-relative">
@@ -250,10 +256,10 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 검색 결과 영역 -->
-        <div id="searchResults"></div>
     </div>
+    
+    <!-- 검색 결과 영역 (container 전체 너비 사용) -->
+    <div id="searchResults"></div>
 </div>
 
 <script>
