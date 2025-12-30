@@ -92,6 +92,11 @@
                     end
                     tf_rank = tf_info.get(rank_col, '-')
                     tf_mindshare = tf_info.get(mindshare_col, 0.0)
+                    
+                    # 마인드쉐어가 0이면 순위도 out으로 표시
+                    if tf_mindshare == 0 or tf_mindshare is None:
+                        tf_rank = 'out'
+                    end
                 %>
                 <div class="col-6 col-md-3">
                     <div class="card h-100 text-center shadow-sm">
@@ -99,7 +104,7 @@
                             <h6 class="card-subtitle mb-2 text-muted fw-bold">{{ tf }}</h6>
                             <div class="mb-2">
                                 <small class="text-muted d-block">{{ t['rank'] if metric == 'snapsPercent' else t['crank'] }}</small>
-                                <h3 class="mb-0 text-primary">{{ tf_rank if tf_rank != '-' else 'out' }}</h3>
+                                <h3 class="mb-0 text-primary">{{ tf_rank if tf_rank != '-' and tf_rank != 'out' else 'out' }}</h3>
                             </div>
                             <div>
                                 <small class="text-muted d-block">{{ t['mindshare'] if metric == 'snapsPercent' else t['cmindshare'] }}</small>
