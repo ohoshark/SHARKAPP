@@ -8,16 +8,25 @@ const searchResults = document.getElementById('searchResults');
 // 자동완성
 searchInput.addEventListener('input', function() {
     clearTimeout(searchTimeout);
-    const query = this.value.trim();
+    let query = this.value.trim();
     selectedIndex = -1; // 검색어 변경 시 선택 초기화
     
-    if (query.length < 2) {
+    // @ prefix 제거
+    if (query.startsWith('@')) {
+        query = query.substring(1).trim();
+        this.value = query;
+    }
+    
+    // 최소 1글자 이상 (한글 1글자도 포함)
+    if (query.length < 1) {
         autocompleteDropdown.style.display = 'none';
         return;
     }
     
     searchTimeout = setTimeout(() => {
-        fetch(`/api/user-search?q=${encodeURIComponent(query)}`)
+        const encodedQuery = encodeURIComponent(query);
+        
+        fetch(`/api/user-search?q=${encodedQuery}`)
             .then(res => {
                 if (!res.ok) {
                     throw new Error('Network response was not ok');
@@ -25,7 +34,6 @@ searchInput.addEventListener('input', function() {
                 return res.json();
             })
             .then(data => {
-                console.log('Search results:', data);
                 if (!data || data.length === 0) {
                     autocompleteDropdown.style.display = 'none';
                     return;
@@ -54,7 +62,6 @@ searchInput.addEventListener('input', function() {
                 });
             })
             .catch(err => {
-                console.error('Search error:', err);
                 autocompleteDropdown.style.display = 'none';
             });
     }, 300);
@@ -84,7 +91,11 @@ searchInput.addEventListener('keydown', function(e) {
             loadUserData(username);
         } else {
             // 선택된 항목이 없으면 입력값으로 검색
-            const username = this.value.trim();
+            let username = this.value.trim();
+            // @ prefix 제거
+            if (username.startsWith('@')) {
+                username = username.substring(1).trim();
+            }
             if (username) {
                 autocompleteDropdown.style.display = 'none';
                 loadUserData(username);
@@ -118,7 +129,11 @@ document.addEventListener('click', function(e) {
 
 // 검색 버튼 클릭
 searchButton.addEventListener('click', function() {
-    const username = searchInput.value.trim();
+    let username = searchInput.value.trim();
+    // @ prefix 제거
+    if (username.startsWith('@')) {
+        username = username.substring(1).trim();
+    }
     if (username) {
         loadUserData(username);
     }
@@ -141,7 +156,6 @@ function loadUserData(username) {
             return res.json();
         })
         .then(data => {
-            console.log('User data:', data);
             if (!data || data.error) {
                 searchResults.innerHTML = `
                     <div class="alert alert-warning text-center">

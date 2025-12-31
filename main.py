@@ -736,23 +736,31 @@ def user_lookup_page():
 @app.route('/api/user-search')
 def api_user_search():
     """유저 검색 자동완성 API"""
-    response.content_type = 'application/json'
-    query = request.query.get('q', '').strip()
+    response.content_type = 'application/json; charset=utf-8'
     
-    if len(query) < 2:
-        return json.dumps([])
+    # URL 쿼리 파라미터에서 직접 가져오기 (UTF-8 디코딩 보장)
+    import urllib.parse
+    query_string = request.environ.get('QUERY_STRING', '')
+    if query_string:
+        parsed = urllib.parse.parse_qs(query_string)
+        query = parsed.get('q', [''])[0].strip()
+    else:
+        query = ''
+    
+    if len(query) < 1:
+        return json.dumps([], ensure_ascii=False)
     
     try:
         results = global_manager.search_users(query, limit=10)
-        return json.dumps(results)
+        return json.dumps(results, ensure_ascii=False)
     except Exception as e:
         print(f"[API Error] user-search: {e}")
-        return json.dumps([])
+        return json.dumps([], ensure_ascii=False)
 
 @app.route('/api/user-data/<username>')
 def api_user_data(username):
     """특정 유저의 전체 데이터 API"""
-    response.content_type = 'application/json'
+    response.content_type = 'application/json; charset=utf-8'
     
     # 검색 로그 기록
     log_access('user_lookup',  username)
@@ -761,12 +769,12 @@ def api_user_data(username):
         data = global_manager.get_user_data(username)
         
         if not data:
-            return json.dumps({'error': 'User not found'})
+            return json.dumps({'error': 'User not found'}, ensure_ascii=False)
         
-        return json.dumps(data)
+        return json.dumps(data, ensure_ascii=False)
     except Exception as e:
         print(f"[API Error] user-data: {e}")
-        return json.dumps({'error': str(e)})
+        return json.dumps({'error': str(e)}, ensure_ascii=False)
 
 # ===================== END GLOBAL ROUTES =====================
 

@@ -92,18 +92,27 @@ class GlobalDataManager:
             conn.commit()
     
     def search_users(self, query, limit=10):
-        """유저 검색 (infoName, displayName 모두 검색)"""
+        """유저 검색 (infoName, displayName 모두 검색) - SQLite 쿼리 기반 (한글 완벽 지원)"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
+            # @ prefix 제거
+            if query.startswith('@'):
+                query = query[1:]
+            
             search_pattern = f'%{query}%'
+            
+            # SQLite에서 직접 필터링 (인덱스 활용, 효율적)
             cursor.execute('''
                 SELECT infoName, displayName, imageUrl, wal_score
                 FROM users
-                WHERE infoName LIKE ? OR displayName LIKE ?
-                ORDER BY infoName
+                WHERE infoName LIKE ? COLLATE NOCASE 
+                   OR displayName LIKE ?
+                ORDER BY 
+                    CASE WHEN infoName LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END,
+                    infoName
                 LIMIT ?
-            ''', (search_pattern, search_pattern, limit))
+            ''', (search_pattern, search_pattern, search_pattern, limit))
             
             results = cursor.fetchall()
             return [
