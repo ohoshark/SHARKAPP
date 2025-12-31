@@ -38,6 +38,23 @@ global_manager = GlobalDataManager()
 PROJECT_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
 WALLCHAIN_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
 CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
+
+# 로그 버퍼 (메모리에 쌓아두고 주기적으로 쓰기)
+LOG_BUFFER = []
+LOG_BUFFER_SIZE = 100  # 100개 쌓이면 파일에 쓰기
+LOG_LOCK = threading.Lock()
+
+def flush_logs():
+    """버퍼에 쌓인 로그를 파일에 쓰기"""
+    with LOG_LOCK:
+        if LOG_BUFFER:
+            try:
+                with open(LOG_FILE, 'a', encoding='utf-8') as f:
+                    f.writelines(LOG_BUFFER)
+                LOG_BUFFER.clear()
+            except Exception as e:
+                print(f"[ERROR] 로그 파일 쓰기 실패: {e}")
+
 def log_access(route_name, project_name, username=None):
     """
     접속 정보를 로그 파일에 기록합니다.
@@ -70,11 +87,12 @@ def log_access(route_name, project_name, username=None):
     # 로그 메시지 포맷: 시간 | IP | 라우트 이름 | 프로젝트 | 사용자명 | 세션 ID
     log_message = f"{timestamp}|{ip_address}|{route_name}|{project_name}|{username or '-'}|{session_id}\n"
     
-    try:
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(log_message)
-    except Exception as e:
-        print(f"[ERROR] 로그 파일 쓰기 실패: {e}")
+    # 버퍼에 추가
+    with LOG_LOCK:
+        LOG_BUFFER.append(log_message)
+        # 버퍼가 꽉 차면 즉시 쓰기
+        if len(LOG_BUFFER) >= LOG_BUFFER_SIZE:
+            threading.Thread(target=flush_logs, daemon=True).start()
         
 def get_cached_projects():
     current_time = time.time()
@@ -152,43 +170,6 @@ def get_grouped_wallchain_projects():
     
     WALLCHAIN_CACHE["grouped"] = grouped
     return grouped
-
-    """
-    접속 정보를 로그 파일에 기록합니다.
-    (헤더: Cloudflare > X-Forwarded-For > X-Real-IP > REMOTE_ADDR 순으로 IP 확인)
-    """
-    
-    # 1. Cloudflare 사용 시 헤더 (HTTP_CF_CONNECTING_IP)를 최우선으로 확인합니다.
-    ip_address = request.environ.get('HTTP_CF_CONNECTING_IP')
-    
-    # 2. X-Forwarded-For 헤더 확인
-    if not ip_address:
-        x_forwarded_for = request.environ.get('HTTP_X_FORWARDED_FOR')
-        # X-Forwarded-For는 여러 프록시를 거쳤을 경우 콤마로 구분된 리스트일 수 있으므로 가장 앞의 IP를 사용
-        if x_forwarded_for:
-            ip_address = x_forwarded_for.split(',')[0].strip()
-
-    # 3. X-Real-IP 헤더 확인
-    if not ip_address:
-        ip_address = request.environ.get('HTTP_X_REAL_IP')
-
-    # 4. 최후의 수단으로 REMOTE_ADDR (이것이 127.0.0.1이 됩니다.)
-    if not ip_address:
-        ip_address = request.environ.get('REMOTE_ADDR', 'UNKNOWN_IP')
-    
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    
-    user_agent = request.environ.get('HTTP_USER_AGENT', 'Unknown')
-    session_id = f"{ip_address}_{user_agent}" 
-
-    # 로그 메시지 포맷: 시간 | IP | 라우트 이름 | 프로젝트 | 사용자명 | 세션 ID
-    log_message = f"{timestamp}|{ip_address}|{route_name}|{project_name}|{username or '-'}|{session_id}\n"
-    
-    try:
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
-            f.write(log_message)
-    except Exception as e:
-        print(f"[ERROR] 로그 파일 쓰기 실패: {e}")
         
 def get_data_processor(project_name):
     # 등록된 인스턴스가 있는지 확인 (없으면 에러)
@@ -420,21 +401,27 @@ def render_error(error_message, project_name=None):
 # 프로젝트 하위 경로 처리
 @app.route('/<projectname>/static/<filepath:path>')
 def serve_project_static(projectname, filepath):
-    return static_file(filepath, root='./static')
+    res = static_file(filepath, root='./static')
+    # 정적 파일 캐시 헤더 (1년) - 브라우저 캐싱
+    response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
+    return res
+
 @app.route('/static/<filename:path>')
 def send_static(filename):
-    return static_file(filename, root='./static') # 또는 이미지가 저장된 폴더명
-# robots.txt 요청을 처리하는 라우트 추가
+    res = static_file(filename, root='./static')
+    # 정적 파일 캐시 헤더 (1년) - 브라우저 캐싱
+    response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
+    return res
+
 @app.route('/robots.txt')
 def robots():
     return static_file('robots.txt', root='./static')
-# 파비콘 요청을 처리하는 라우트 추가
+
 @app.route('/favicon.ico')
 def favicon():
-    # static_file(파일 이름, root=파일이 있는 디렉터리 경로)
-    # 실제 static 폴더 경로에 맞게 수정하세요.
-    # print("--- DEBUG: Favicon 라우트 호출됨 ---")
-    return static_file('favicon.ico', root='./static')
+    res = static_file('favicon.ico', root='./static')
+    response.set_header('Cache-Control', 'public, max-age=86400')  # 1일
+    return res
 
 # ===================== GLOBAL DATA MANAGEMENT =====================
 
@@ -1891,8 +1878,19 @@ if __name__ == '__main__':
     print("="*60 + "\n")
     
     try:
-        # Waitress로 서버 구동 시 host='0.0.0.0' 및 threads=50 설정으로 다중 접속을 지원합니다.
-        serve(app, host='0.0.0.0', port=8080, threads=50)
+        # Waitress 최적화 설정
+        # threads: CPU 코어 수 * 2 (최소 4, 최대 16)
+        import multiprocessing
+        optimal_threads = max(4, min(16, multiprocessing.cpu_count() * 2))
+        
+        print(f"⚡ Waitress threads: {optimal_threads}")
+        serve(app, 
+              host='0.0.0.0', 
+              port=8080, 
+              threads=optimal_threads,
+              channel_timeout=60,  # 요청 타임아웃 60초
+              cleanup_interval=10,  # 연결 정리 주기
+              asyncore_use_poll=True)  # epoll 사용 (Linux에서 성능 향상)
     except KeyboardInterrupt:
         print("\n[시스템] 종료 중... 모든 프로세스를 강제 종료합니다.")
         import os
