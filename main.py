@@ -1489,7 +1489,7 @@ def wallchain_leaderboard(projectname):
                 lambda x: f"{x}" if x > 0 else (f"{x}")
             )
             compare_data['mindshare_change_display'] = compare_data['mindshare_change'].apply(
-                lambda x: f"{x:.4f}%" if x > 0 else (f"{x:.4f}")
+                lambda x: f"{x:.4f}" if x > 0 else (f"{x:.4f}")
             )
             
             if lang == 'ko':

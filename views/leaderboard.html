@@ -113,7 +113,21 @@
 			.dataTables_wrapper .dataTables_paginate {
 				padding: 0.5rem 0.25rem;
 			}
-			}
+		}
+		
+		/* 다크모드에서 상승 색상 유지 - DataTables 초기화 후에도 적용 */
+		.dark-mode .text-success,
+		.dark-mode table .text-success,
+		.dark-mode .dataTables_wrapper .text-success,
+		.dark-mode #leaderboardTable .text-success {
+			color: #28a745 !important;
+		}
+		.dark-mode .text-danger,
+		.dark-mode table .text-danger,
+		.dark-mode .dataTables_wrapper .text-danger,
+		.dark-mode #leaderboardTable .text-danger {
+			color: #dc3545 !important;
+		}
 	</style>
 </head>
 
