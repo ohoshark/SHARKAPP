@@ -1,6 +1,35 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/common.js"></script>
 
+<style>
+    /* 다크모드에서 모달이 영향받지 않도록 */
+    .dark-mode #creatorModal .modal-content {
+        background-color: white !important;
+        color: #000 !important;
+    }
+    .dark-mode #creatorModal .text-dark {
+        color: #000 !important;
+    }
+    .dark-mode #creatorModal .text-muted {
+        color: #000 !important;
+    }
+    .dark-mode #creatorModal .text-info {
+        color: #0dcaf0 !important;
+    }
+    .dark-mode #creatorModal .btn-dark {
+        background-color: #212529 !important;
+        color: white !important;
+    }
+    .dark-mode #creatorModal h3 {
+        color: #000 !important;
+    }
+    .dark-mode #creatorModal .custom-cookie-btn {
+        background-color: #aaf0d1 !important;
+        color: #000 !important;
+        border-color: #aaf0d1 !important;
+    }
+</style>
+
 <div class="modal fade" id="creatorModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content border-0 shadow-lg" 
