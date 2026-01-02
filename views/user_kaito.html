@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="{{lang}}">
+% include('_head.html')
+<link rel="stylesheet" href="/static/css/user.css">
+<title>{{projectname.upper()}} {{user_info.get('displayName', handle)}} {{t['user_analysis']}} - SHARKAPP</title>
+</head>
+<body>
+% include('_navbar.html')
+
+<div class="container mt-4">
+    <!-- 사용자 프로필 카드 -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    % if user_info.get('imageId'):
+                        <img src="https://pbs.twimg.com/profile_images/{{user_info['imageId']}}/large.jpg" alt="{{user_info.get('displayName', handle)}}" style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
+                    % end
+                </div>
+                <div class="col">
+                    <h2 class="mb-1">
+                        <a href="https://x.com/{{handle}}" class="user-link" target="_blank">{{user_info.get('displayName', handle)}}</a>
+                    </h2>
+                    <p class="text-muted mb-2">
+                        <a href="https://x.com/{{handle}}" class="user-link" target="_blank">@{{handle}}</a>
+                    </p>
+                    <div class="d-flex gap-4">
+                        <div>
+                            <small class="text-muted d-block">{{t['followers']}}</small>
+                            <strong>{{user_info.get('follower', 'N/A')}}</strong>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">{{t['smart_followers']}}</small>
+                            <strong>{{user_info.get('smartFollower', 'N/A')}}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 타임프레임별 통계 -->
+    <div class="mb-4">
+        <h4 class="mb-3">{{t['rank']}} & {{t['mindshare']}}</h4>
+        <div class="row g-3">
+            % for tf in timeframes:
+                <%
+                    tf_info = user_info_by_timeframe.get(tf, {})
+                    if not tf_info:
+                        continue
+                    end
+                    tf_rank = tf_info.get('rank', '-')
+                    tf_mindshare = tf_info.get('mindshare', '0%')
+                %>
+                <div class="col-6 col-md-4">
+                    <div class="card h-100 text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted fw-bold">{{tf}}</h6>
+                            <div class="mb-2">
+                                <small class="text-muted d-block">{{t['rank']}}</small>
+                                <h3 class="mb-0 text-primary">{{tf_rank}}</h3>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">{{t['mindshare']}}</small>
+                                <h4 class="mb-0 text-success">{{tf_mindshare}}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            % end
+        </div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="chart-container" style="margin-top: 0;">
+        <div class="card">
+            <div class="card-header">
+                <h3>{{t['chart_title']}}</h3>
+            </div>
+            <div class="card-body chart-relative" id="chartCardBody">
+                <div id="chart-loading-overlay" class="chart-loading-overlay" style="display: none;">
+                    Loading Chart Data...
+                </div>
+                {{ !user_chart }}
+            </div>
+        </div>
+    </div>
+</div>
+
+% include('_footer.html')
+<script src="/static/js/user.js"></script>
+</body>
+</html>

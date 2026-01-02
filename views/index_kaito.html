@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<%
+    # i18n 사전 설정
+    i18n = {
+        'ko': {
+            'user_analysis': '사용자 분석',
+            'leaderboard_analysis': '리더보드 분석',
+            'alias_form': '별명 또는 핸들 입력',
+            'search_placeholder': '사용자 검색 (이름 또는 ID)',
+            'close': '닫기',
+            'copy_success': '지갑 주소가 복사되었습니다! 🦈',
+            'click_to_copy': '클릭하여 주소 복사 🦈'
+        },
+        'en': {
+            'user_analysis': 'User Analysis',
+            'leaderboard_analysis': 'Leaderboard',
+            'alias_form': 'Enter a nickname or handle',
+            'search_placeholder': 'Search users (Name or ID)',
+            'close': 'Close',
+            'copy_success': 'Wallet address copied! 🦈',
+            'click_to_copy': 'Click to copy address🦈'
+        }
+    }
+    t = i18n.get(lang, i18n['ko'])
+%>
+<html lang="{{lang}}">
+% include('_head.html')
+</head>
+<body>
+% include('_navbar.html')
+
+    <div class="container mt-4 chart-relative" id="chartCardBody">
+<!-- 사용자 검색 -->
+<div class="chart-container" >
+		<div id="chart-loading-overlay" class="chart-loading-overlay">
+			데이터 로딩 중...
+		</div>
+    <div class="card">
+        <div class="card-header">
+            <h3>🤖 {{projectname.upper()}} {{t['user_analysis']}}</h3>
+        </div>
+		<div class="card-body">
+            <div class="mb-3">
+                <input type="text" class="form-control" id="userSearch" placeholder="{{t['alias_form']}}">
+            </div>
+            <div class="list-group" style="max-height: 300px; overflow-y: auto;">
+                % for user in all_users:
+                    <a href="/kaito/{{projectname}}/user/{{user['handle']}}" 
+                       class="list-group-item list-group-item-action user-item" 
+                       data-handle="{{user['handle']}}"
+                       data-displayname="{{user['displayName']}}">
+                        <strong>{{user['displayName']}}</strong> <span class="text-muted">@{{user['handle']}}</span>
+                    </a>
+                % end
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// User search functionality
+document.getElementById('userSearch').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const userItems = document.querySelectorAll('.user-item');
+    
+    userItems.forEach(item => {
+        const handle = item.dataset.handle.toLowerCase();
+        const displayName = item.dataset.displayname.toLowerCase();
+        if (handle.includes(searchTerm) || displayName.includes(searchTerm)) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+});
+</script>
+
+% include('_footer.html')
+</body>
+</html>

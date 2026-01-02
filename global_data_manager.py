@@ -19,9 +19,26 @@ class GlobalDataManager:
                     infoName TEXT PRIMARY KEY,
                     displayName TEXT,
                     imageUrl TEXT,
-                    wal_score INTEGER
+                    wal_score INTEGER,
+                    cookie_smart_follower INTEGER,
+                    kaito_smart_follower INTEGER,
+                    follower INTEGER
                 )
             ''')
+            
+            # 기존 테이블에 컬럼 추가 (이미 있으면 무시)
+            try:
+                cursor.execute('ALTER TABLE users ADD COLUMN cookie_smart_follower INTEGER')
+            except:
+                pass
+            try:
+                cursor.execute('ALTER TABLE users ADD COLUMN kaito_smart_follower INTEGER')
+            except:
+                pass
+            try:
+                cursor.execute('ALTER TABLE users ADD COLUMN follower INTEGER')
+            except:
+                pass
             
             # 순위 정보 테이블
             cursor.execute('''
@@ -46,32 +63,55 @@ class GlobalDataManager:
             conn.commit()
             print("[GlobalDataManager] Database initialized")
     
-    def update_user(self, info_name, display_name=None, image_url=None, wal_score=None):
-        """유저 정보 업데이트 (wallchain 우선, 변경사항 있으면 갱신)"""
+    def update_user(self, info_name, display_name=None, image_url=None, wal_score=None, 
+                   cookie_smart_follower=None, kaito_smart_follower=None, follower=None):
+        """유저 정보 업데이트 (wallchain > cookie > kaito 우선순위)"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             # 기존 데이터 확인
-            cursor.execute('SELECT displayName, imageUrl, wal_score FROM users WHERE infoName = ?', (info_name,))
+            cursor.execute('SELECT displayName, imageUrl, wal_score, cookie_smart_follower, kaito_smart_follower, follower FROM users WHERE infoName = ?', (info_name,))
             existing = cursor.fetchone()
             
             if existing:
-                # 기존 데이터가 있으면 업데이트 (wallchain 데이터 우선)
+                # 기존 데이터가 있으면 업데이트
                 new_display_name = display_name if display_name else existing[0]
-                new_image_url = image_url if image_url else existing[1]
                 new_wal_score = wal_score if wal_score is not None else existing[2]
+                
+                # image_url 우선순위 처리: wallchain > cookie > kaito
+                # kaito는 숫자만 있는 경우가 많으므로, 숫자만 있으면 기존 데이터 유지
+                if image_url:
+                    # 새로운 image_url이 숫자만 있는 경우 (kaito)
+                    if image_url.isdigit():
+                        # 기존에 숫자가 아닌 URL이 있으면 유지 (wallchain/cookie 우선)
+                        new_image_url = existing[1] if existing[1] and not existing[1].isdigit() else image_url
+                    else:
+                        # 숫자가 아닌 URL (wallchain/cookie)은 항상 업데이트
+                        new_image_url = image_url
+                else:
+                    # image_url이 None이면 기존 데이터 유지
+                    new_image_url = existing[1]
+                
+                # 팔로워 정보 업데이트 (값이 있을 때만)
+                new_cookie_smart = cookie_smart_follower if cookie_smart_follower is not None else existing[3]
+                new_kaito_smart = kaito_smart_follower if kaito_smart_follower is not None else existing[4]
+                new_follower = follower if follower is not None else existing[5]
                 
                 cursor.execute('''
                     UPDATE users 
-                    SET displayName = ?, imageUrl = ?, wal_score = ?
+                    SET displayName = ?, imageUrl = ?, wal_score = ?,
+                        cookie_smart_follower = ?, kaito_smart_follower = ?, follower = ?
                     WHERE infoName = ?
-                ''', (new_display_name, new_image_url, new_wal_score, info_name))
+                ''', (new_display_name, new_image_url, new_wal_score,
+                      new_cookie_smart, new_kaito_smart, new_follower, info_name))
             else:
                 # 새로운 유저 추가
                 cursor.execute('''
-                    INSERT INTO users (infoName, displayName, imageUrl, wal_score)
-                    VALUES (?, ?, ?, ?)
-                ''', (info_name, display_name, image_url, wal_score))
+                    INSERT INTO users (infoName, displayName, imageUrl, wal_score,
+                                     cookie_smart_follower, kaito_smart_follower, follower)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (info_name, display_name, image_url, wal_score,
+                      cookie_smart_follower, kaito_smart_follower, follower))
             
             conn.commit()
     
@@ -104,7 +144,8 @@ class GlobalDataManager:
             
             # SQLite에서 직접 필터링 (인덱스 활용, 효율적)
             cursor.execute('''
-                SELECT infoName, displayName, imageUrl, wal_score
+                SELECT infoName, displayName, imageUrl, wal_score,
+                       cookie_smart_follower, kaito_smart_follower, follower
                 FROM users
                 WHERE infoName LIKE ? COLLATE NOCASE 
                    OR displayName LIKE ?
@@ -120,7 +161,10 @@ class GlobalDataManager:
                     'infoName': row[0],
                     'displayName': row[1],
                     'imageUrl': row[2],
-                    'wal_score': row[3]
+                    'wal_score': row[3],
+                    'cookie_smart_follower': row[4],
+                    'kaito_smart_follower': row[5],
+                    'follower': row[6]
                 }
                 for row in results
             ]
@@ -141,7 +185,10 @@ class GlobalDataManager:
                 'infoName': user_row[0],
                 'displayName': user_row[1],
                 'imageUrl': user_row[2],
-                'wal_score': user_row[3]
+                'wal_score': user_row[3],
+                'cookie_smart_follower': user_row[4] if len(user_row) > 4 else None,
+                'kaito_smart_follower': user_row[5] if len(user_row) > 5 else None,
+                'follower': user_row[6] if len(user_row) > 6 else None
             }
             
             # 순위 정보 (프로젝트별로 그룹화)
@@ -157,6 +204,7 @@ class GlobalDataManager:
             # 프로젝트별로 그룹화
             cookie_projects = {}
             wallchain_projects = {}
+            kaito_projects = {}
             
             for row in rankings_rows:
                 project_name = row[0]
@@ -176,11 +224,15 @@ class GlobalDataManager:
                     'positionChange': position_change
                 }
                 
-                # 프로젝트명으로 cookie/wallchain 구분
+                # 프로젝트명으로 cookie/wallchain/kaito 구분
                 if project_name.startswith('wallchain-'):
                     if project_name not in wallchain_projects:
                         wallchain_projects[project_name] = []
                     wallchain_projects[project_name].append(ranking_data)
+                elif project_name.startswith('kaito-'):
+                    if project_name not in kaito_projects:
+                        kaito_projects[project_name] = []
+                    kaito_projects[project_name].append(ranking_data)
                 else:
                     if project_name not in cookie_projects:
                         cookie_projects[project_name] = []
@@ -189,7 +241,8 @@ class GlobalDataManager:
             return {
                 'user': user_info,
                 'cookie_projects': cookie_projects,
-                'wallchain_projects': wallchain_projects
+                'wallchain_projects': wallchain_projects,
+                'kaito_projects': kaito_projects
             }
     
     def clear_all_rankings(self):
@@ -213,7 +266,10 @@ class GlobalDataManager:
                     infoName TEXT PRIMARY KEY,
                     displayName TEXT,
                     imageUrl TEXT,
-                    wal_score INTEGER
+                    wal_score INTEGER,
+                    cookie_smart_follower INTEGER,
+                    kaito_smart_follower INTEGER,
+                    follower INTEGER
                 )
             ''')
             
@@ -239,8 +295,9 @@ class GlobalDataManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.executemany('''
-                INSERT OR REPLACE INTO users_temp (infoName, displayName, imageUrl, wal_score)
-                VALUES (?, ?, ?, ?)
+                INSERT OR REPLACE INTO users_temp (infoName, displayName, imageUrl, wal_score,
+                                                  cookie_smart_follower, kaito_smart_follower, follower)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', users_data)
             conn.commit()
     

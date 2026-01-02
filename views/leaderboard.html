@@ -306,13 +306,27 @@
 		});
     </script>
 	<script>
+		// HTML에서 data-order 속성 추출 또는 텍스트에서 숫자 추출
 		$.fn.dataTable.ext.type.order['special-num-pre'] = function ( data ) {
-			let num = data.replace(/[↑↓,-]/g, ''); 
+			// data-order 속성이 있으면 그 값 사용
+			const match = data.match(/data-order="([^"]+)"/);
+			if (match) {
+				return parseFloat(match[1]);
+			}
 			
-			if (num === '') {
+			// NEW, OUT 배지 처리 (0으로 처리)
+			if (data.includes('NEW')) {
+				return 0;
+			}
+			if (data.includes('OUT')) {
 				return 0;
 			}
 			
+			// 화살표와 특수문자 제거 후 숫자 추출
+			let num = data.replace(/<[^>]*>/g, '').replace(/[↑↓,+%\s-]/g, '');
+			if (num === '' || isNaN(num)) {
+				return 0;
+			}
 			return parseFloat(num);
 		};
 
@@ -349,7 +363,7 @@
 			"order": [[2, 'asc']], 
 			"columnDefs": [
 				{ "orderable": false, "targets": 0 },
-				{ "orderable": true, "targets": "_all" }
+				{ "type": "special-num", "targets": [3, 6] }
 			]
 		});
 		

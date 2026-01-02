@@ -119,6 +119,10 @@
     border-left-color: #17a2b8;
 }
 
+.kaito-card {
+    border-left-color: #6f42c1;
+}
+
 .project-card .card-title {
     font-size: 1rem;
     margin-bottom: 10px;
@@ -163,6 +167,18 @@ html.dark-mode .user-detail-link {
 
 .wallchain-card .card-title {
     background: linear-gradient(135deg, #06beb6 0%, #48b1bf 100%);
+}
+
+.kaito-card .card-title {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.project-type-icon.kaito {
+    top: -15px;
+    left: -15px;
+    width: 48px;
+    height: 48px;
+    font-size: 2.2rem;
 }
 
 .timeframe-container {

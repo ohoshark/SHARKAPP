@@ -16,7 +16,21 @@
                     {{current_flag}} {{current_name}}
                 </button>
                 <ul class="dropdown-menu shadow border-0" style="padding: 5px; background-color: rgba(255,255,255,0.6); backdrop-filter: blur(6px); margin-left: -50px;" aria-labelledby="projectDropdown">
+                    
+                    <!-- Kaito 프로젝트 (최상단) -->
+                    % if kaito_projects:
+                        <li>
+                            <a class="dropdown-header text-warning fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#kaitoProjectModal" onclick="event.stopPropagation();">
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🤖 Kaito<i class="fas fa-chevron-right" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                            </a>
+                        </li>
+                    % end
+                    
+                    <!-- Wallchain 프로젝트 -->
                     % if grouped_wallchain:
+                        % if kaito_projects:
+                            <li><hr class="dropdown-divider"></li>
+                        % end
                         <li>
                             <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
                                 <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
@@ -65,8 +79,9 @@
                         </div>
                     % end
                     
+                    <!-- Cookie 프로젝트 -->
                     % if grouped_projects:
-                        % if grouped_wallchain:
+                        % if grouped_wallchain or kaito_projects:
                             <li><hr class="dropdown-divider"></li>
                         % end
                         <li>
@@ -116,6 +131,7 @@
                         % end
                         </div>
                     % end
+                    
                 </ul>
             </div>
         </div>
@@ -129,10 +145,17 @@
                 <%
                     # 현재 페이지가 wallchain인지, 글로벌 검색인지 확인
                     is_wallchain = get('is_wallchain', False)
+                    is_kaito = get('is_kaito', False)
                     is_global = (project == 'SEARCH' or current_page == 'user_lookup')
                     
                     if not is_global:
-                        base_url = f"/wallchain/{project}" if is_wallchain else f"/cookie/{project}"
+                        if is_kaito:
+                            base_url = f"/kaito/{project}"
+                        elif is_wallchain:
+                            base_url = f"/wallchain/{project}"
+                        else:
+                            base_url = f"/cookie/{project}"
+                        end
                     end
                 %>
                 % if not is_global:
@@ -166,3 +189,64 @@
         </div>
     </div>
 </nav>
+<!-- Kaito 프로젝트 선택 모달 -->
+% if kaito_projects:
+<div class="modal fade" id="kaitoProjectModal" tabindex="-1" aria-labelledby="kaitoProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="kaitoProjectModalLabel">🤖 Kaito 프로젝트 선택 ({{len(kaito_projects)}}개)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 검색 입력 -->
+                <div class="mb-3">
+                    <input type="text" id="kaitoProjectSearch" class="form-control" placeholder="프로젝트 이름으로 검색...">
+                </div>
+                
+                <!-- 프로젝트 목록 -->
+                <div class="row g-2" id="kaitoProjectList">
+                    % for kaito_proj in sorted(kaito_projects):
+                        <div class="col-md-6 col-lg-4 kaito-project-item" data-project-name="{{kaito_proj.lower()}}">
+                            <a href="/kaito/{{kaito_proj}}" class="btn btn-outline-primary w-100 text-start" style="text-transform: uppercase;">
+                                🌐 {{kaito_proj}}
+                            </a>
+                        </div>
+                    % end
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Kaito 프로젝트 검색 기능
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('kaitoProjectSearch');
+    const projectItems = document.querySelectorAll('.kaito-project-item');
+    
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase().trim();
+            
+            projectItems.forEach(item => {
+                const projectName = item.getAttribute('data-project-name');
+                if (projectName.includes(query)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+        
+        // 모달이 열릴 때 검색 입력 초기화 및 포커스
+        const modal = document.getElementById('kaitoProjectModal');
+        modal.addEventListener('shown.bs.modal', function() {
+            searchInput.value = '';
+            searchInput.focus();
+            projectItems.forEach(item => item.style.display = '');
+        });
+    }
+});
+</script>
+% end

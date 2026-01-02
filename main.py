@@ -13,6 +13,7 @@ import time
 from datetime import datetime
 from data_processor import DataProcessor
 from data_processor_wallchain import DataProcessorWallchain
+from data_processor_kaito import DataProcessorKaito
 from global_data_manager import GlobalDataManager
 import schedule
 
@@ -24,10 +25,12 @@ TEMPLATE_PATH.insert(0, './')
 
 base_data_dir = './data/cookie/'  # Cookie 데이터 디렉토리
 base_wallchain_dir = './data/wallchain/'  # Wallchain 데이터 디렉토리
+base_kaito_dir = './data/kaito/'  # Kaito 데이터 디렉토리
 
 # 프로젝트별 DataProcessor 인스턴스 관리
 project_instances = {}  # Cookie 프로젝트
 wallchain_instances = {}  # Wallchain 프로젝트
+kaito_processor = None  # Kaito 통합 프로세서
 # main.py 파일 상단에 로그 파일 경로 설정
 LOG_FILE = 'access_log.txt'
 
@@ -37,6 +40,7 @@ global_manager = GlobalDataManager()
 # main.py 파일 내 log_access 함수를 아래와 같이 수정
 PROJECT_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
 WALLCHAIN_CACHE = {"list": [], "grouped": {}, "last_updated": 0}
+KAITO_CACHE = {"list": [], "last_updated": 0}
 CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 
 # 로그 버퍼 (메모리에 쌓아두고 주기적으로 쓰기)
@@ -374,6 +378,114 @@ def scan_for_new_projects():
     thread = threading.Thread(target=periodic_scanner, daemon=True)
     thread.start()
     print("[프로젝트 스캐너] 5분마다 새 프로젝트 탐색 시작")
+
+# ===================== KAITO FUNCTIONS =====================
+
+def get_cached_kaito_projects():
+    """Kaito 프로젝트 목록 캐시 (5분마다 자동 갱신)"""
+    current_time = time.time()
+    
+    if not kaito_processor:
+        return []
+    
+    if KAITO_CACHE["list"] and (current_time - KAITO_CACHE["last_updated"] < CACHE_INTERVAL):
+        return KAITO_CACHE["list"]
+    
+    # 캐시 갱신
+    projects = kaito_processor.scan_projects()
+    KAITO_CACHE["list"] = projects
+    KAITO_CACHE["last_updated"] = current_time
+    print(f"[Kaito 캐시 갱신] {len(projects)}개 프로젝트 - {datetime.now().strftime('%H:%M:%S')}")
+    return projects
+
+def init_kaito_on_startup():
+    """Kaito 프로세서 초기화"""
+    global kaito_processor
+    
+    print("\n🎯 [Kaito 초기화] 통합 DB 프로세서 생성...")
+    kaito_processor = DataProcessorKaito()
+    print("✅ [Kaito] 통합 DB 생성 완료")
+
+def start_kaito_data_loader():
+    """Kaito 데이터 로더 스레드 (단일 스레드로 순차 처리)"""
+    def kaito_periodic_loader():
+        print("[Kaito] 데이터 로더 스레드 시작")
+        
+        # 최초 한 번 전체 로드
+        try:
+            print("[Kaito] 초기 데이터 로드 시작...")
+            projects = kaito_processor.scan_projects()
+            
+            for project in projects:
+                timeframes = ['7D', '30D', '90D', '180D', '360D']
+                
+                for timeframe in timeframes:
+                    new_files = kaito_processor.check_new_files(project, timeframe)
+                    
+                    if new_files:
+                        print(f"[Kaito] {project}/{timeframe}: {len(new_files)}개 파일 로드 중...")
+                        
+                        for filepath in new_files:
+                            data = kaito_processor.load_json_file(filepath)
+                            
+                            if data:
+                                # 타임스탬프 추출
+                                filename = os.path.basename(filepath)
+                                timestamp_str = filename.replace('.json', '').replace('_', '-')
+                                
+                                # 데이터 삽입
+                                kaito_processor.insert_data(project, timeframe, timestamp_str, data)
+                        
+                        print(f"[Kaito] {project}/{timeframe}: 완료 ✓")
+            
+            print("[Kaito] ✅ 초기 데이터 로드 완료")
+        except Exception as e:
+            print(f"[Kaito] ❌ 초기 로드 오류: {e}")
+        
+        # 주기적으로 신규 파일 체크 (30초마다)
+        while True:
+            try:
+                time.sleep(30)
+                
+                projects = kaito_processor.scan_projects()
+                new_data_found = False
+                
+                for project in projects:
+                    timeframes = ['7D', '30D', '90D', '180D', '360D']
+                    
+                    for timeframe in timeframes:
+                        new_files = kaito_processor.check_new_files(project, timeframe)
+                        
+                        if new_files:
+                            if not new_data_found:
+                                print(f"\n[Kaito] 신규 데이터 발견...")
+                                new_data_found = True
+                            
+                            print(f"[Kaito] {project}/{timeframe}: {len(new_files)}개 파일")
+                            
+                            for filepath in new_files:
+                                data = kaito_processor.load_json_file(filepath)
+                                
+                                if data:
+                                    filename = os.path.basename(filepath)
+                                    timestamp_str = filename.replace('.json', '').replace('_', '-')
+                                    kaito_processor.insert_data(project, timeframe, timestamp_str, data)
+                            
+                            print(f"[Kaito] {project}/{timeframe}: 완료 ✓")
+                
+                if new_data_found:
+                    print("[Kaito] ✅ 신규 데이터 로드 완료\n")
+                    # 캐시 무효화
+                    KAITO_CACHE["list"] = []
+                    
+            except Exception as e:
+                print(f"[Kaito] 데이터 로드 오류: {e}")
+    
+    thread = threading.Thread(target=kaito_periodic_loader, daemon=True)
+    thread.start()
+
+# ===================== END KAITO FUNCTIONS =====================
+
                 
 def render_error(error_message, project_name=None):
     try:
@@ -392,6 +504,7 @@ def render_error(error_message, project_name=None):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        error_message=error_message,
                        project_instances=project_instances,
                        json=json)
@@ -460,7 +573,8 @@ def update_global_rankings():
                         # 해당 타임스탬프의 모든 유저 데이터
                         cursor.execute('''
                             SELECT username, displayName, profileImageUrl, 
-                                   rank, cSnapsPercentRank, snapsPercent, cSnapsPercent
+                                   rank, cSnapsPercentRank, snapsPercent, cSnapsPercent,
+                                   followers, smartFollowers
                             FROM snaps 
                             WHERE timestamp = ? AND timeframe = ?
                         ''', (latest_ts, timeframe))
@@ -475,10 +589,13 @@ def update_global_rankings():
                             cms_rank = row[4]  # cSnapsPercentRank -> cms_rank
                             ms_percent = row[5]  # snapsPercent -> ms_percent
                             cms_percent = row[6]  # cSnapsPercent -> cms_percent
+                            followers = row[7] if len(row) > 7 else None
+                            smart_followers = row[8] if len(row) > 8 else None
                             
                             # 유저 정보 수집 (wallchain 우선이므로 없을 때만)
                             if username not in users_batch:
-                                users_batch[username] = (username, display_name, image_url, None)
+                                users_batch[username] = (username, display_name, image_url, None,
+                                                        smart_followers, None, followers)
                             
                             # 순위 정보 수집
                             rankings_batch.append((
@@ -528,8 +645,16 @@ def update_global_rankings():
                             position_change = row[5]
                             mindshare_percentage = row[6]
                             
-                            # 유저 정보 수집 (wallchain 우선 - 덮어쓰기)
-                            users_batch[username] = (username, display_name, image_url, score)
+                            # 유저 정보 수집 (wallchain이 최우선이지만 팔로워 정보는 유지)
+                            if username in users_batch:
+                                # 이미 있으면 wallchain 정보만 업데이트 (팔로워 정보는 유지)
+                                existing = users_batch[username]
+                                users_batch[username] = (username, display_name, image_url, score,
+                                                        existing[4], existing[5], existing[6])  # 팔로워 정보 유지
+                            else:
+                                # 없으면 새로 추가 (팔로워 정보 없음)
+                                users_batch[username] = (username, display_name, image_url, score,
+                                                        None, None, None)
                             
                             # 순위 정보 수집
                             rankings_batch.append((
@@ -541,6 +666,100 @@ def update_global_rankings():
                 
             except Exception as e:
                 print(f"[Wallchain] {project_name} 오류: {e}")
+        
+        # Kaito 프로젝트 데이터 수집
+        if kaito_processor:
+            try:
+                print(f"[Kaito] 데이터 수집 중...")
+                
+                # Kaito DB에서 최신 데이터 가져오기
+                with sqlite3.connect('./data/kaito/kaito_projects.db') as conn:
+                    cursor = conn.cursor()
+                    
+                    # 각 프로젝트별 최신 타임스탬프 찾기
+                    cursor.execute('''
+                        SELECT projectName, timeframe, MAX(timestamp) as latest_ts
+                        FROM rankings
+                        GROUP BY projectName, timeframe
+                    ''')
+                    
+                    latest_timestamps = cursor.fetchall()
+                    
+                    # 고유 프로젝트 목록 추출 (중복 제거)
+                    unique_projects = set()
+                    for project_name, timeframe, latest_ts in latest_timestamps:
+                        unique_projects.add(project_name)
+                    
+                    print(f"[Kaito] 발견된 프로젝트 수: {len(unique_projects)}")
+                    
+                    for project_name, timeframe, latest_ts in latest_timestamps:
+                        # 해당 프로젝트/timeframe의 최신 데이터 가져오기
+                        cursor.execute('''
+                            SELECT handle, displayName, imageId, rank, mindshare, smartFollower, follower
+                            FROM rankings
+                            WHERE projectName = ? AND timeframe = ? AND timestamp = ?
+                        ''', (project_name, timeframe, latest_ts))
+                        
+                        rows = cursor.fetchall()
+                        
+                        for row in rows:
+                            handle = row[0]  # handle (@ 없이 저장됨)
+                            display_name = row[1]
+                            image_id = row[2]
+                            rank = row[3]
+                            mindshare_str = row[4]  # "22.66%" 형식
+                            smart_follower_str = row[5] if len(row) > 5 else None
+                            follower_str = row[6] if len(row) > 6 else None
+                            
+                            # mindshare를 숫자로 변환
+                            try:
+                                mindshare_value = float(mindshare_str.rstrip('%'))
+                            except:
+                                mindshare_value = 0.0
+                            
+                            # 팔로워 수를 정수로 변환
+                            try:
+                                smart_follower = int(smart_follower_str.replace(',', '')) if smart_follower_str else None
+                            except:
+                                smart_follower = None
+                            
+                            try:
+                                follower = int(follower_str.replace(',', '')) if follower_str else None
+                            except:
+                                follower = None
+                            
+                            # 이미지 URL 생성
+                            if image_id:
+                                image_url = image_id  # 숫자 ID만 저장 (wallchain/cookie 우선순위 로직에서 처리)
+                            else:
+                                image_url = ""
+                            
+                            # 유저 정보 수집
+                            if handle in users_batch:
+                                # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
+                                existing = users_batch[handle]
+                                # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
+                                final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
+                                users_batch[handle] = (handle, existing[1], final_image, existing[3],
+                                                      existing[4], smart_follower, follower)  # kaito_smart와 follower 업데이트
+                            else:
+                                # 없으면 새로 추가
+                                users_batch[handle] = (handle, display_name, image_url, None,
+                                                      None, smart_follower, follower)
+                            
+                            # 순위 정보 수집 (kaito- prefix 추가)
+                            full_project_name = f"kaito-{project_name}"
+                            rankings_batch.append((
+                                handle, full_project_name, timeframe,
+                                rank, None, mindshare_value, None, None
+                            ))
+                
+                print(f"[Kaito] 데이터 수집 완료 ✓")
+                
+            except Exception as e:
+                print(f"[Kaito] 데이터 수집 오류: {e}")
+                import traceback
+                traceback.print_exc()
         
         # 배치 삽입
         print(f"[글로벌 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
@@ -595,7 +814,13 @@ def update_global_rankings():
 
 def schedule_global_updates():
     """매 시간 15분에 글로벌 DB 갱신 스케줄링"""
-    schedule.every().hour.at(":15").do(update_global_rankings)
+    
+    def scheduled_update():
+        """스케줄된 갱신 작업 (로그 추가)"""
+        print(f"\n[글로벌 DB 스케줄러] 정기 갱신 트리거됨 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        update_global_rankings()
+    
+    schedule.every().hour.at(":15").do(scheduled_update)
     
     # DB가 비어있으면 즉시 갱신, 아니면 5분 후 갱신
     def initial_update():
@@ -607,11 +832,12 @@ def schedule_global_updates():
                 time.sleep(1)
                 wait_time += 1
             
-            if not project_instances and not wallchain_instances:
+            if not project_instances and not wallchain_instances and not kaito_processor:
                 print("[글로벌 DB] 경고: 프로젝트가 초기화되지 않았습니다.")
                 return
             
-            print(f"[글로벌 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}")
+            kaito_count = len(get_cached_kaito_projects()) if kaito_processor else 0
+            print(f"[글로벌 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}, Kaito: {kaito_count}")
             
             # 데이터베이스에 데이터가 있는지 확인
             conn = sqlite3.connect('./data/global_rankings.db')
@@ -638,12 +864,13 @@ def schedule_global_updates():
     
     # 스케줄러 실행
     def run_scheduler():
+        print(f"[글로벌 DB 스케줄러] 백그라운드 실행 시작 - 매 시간 15분에 갱신")
         while True:
             schedule.run_pending()
             time.sleep(30)
     
     threading.Thread(target=run_scheduler, daemon=True).start()
-    print("[글로벌 DB 스케줄러] 매 시간 15분 갱신으로 설정됨")
+    print("[글로벌 DB 스케줄러] 설정 완료 ✓")
 
 @app.route('/ref')
 @app.route('/')
@@ -718,6 +945,7 @@ def user_lookup_page():
                    all_wallchain_projects=all_wallchain_projects,
                    grouped_projects=grouped_projects,
                    grouped_wallchain=grouped_wallchain,
+                   kaito_projects=get_cached_kaito_projects(),
                    t={})
 
 @app.route('/api/user-search')
@@ -826,6 +1054,7 @@ def project_index(projectname):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        all_users=all_users,
                        timeframe=timeframe,
                        timeframes=dp.timeframes)
@@ -948,15 +1177,39 @@ def project_leaderboard(projectname):
                     <tbody>
                 """
             for i, row in enumerate(compare_data.itertuples(), 1):
-                # 순위 변화에 따른 스타일 설정
-                rank_change_class = "text-success" if row.rank_change > 0 else ("text-danger" if row.rank_change < 0 else "")
-                mindshare_change_value = getattr(row, mindshare_change_col)
-                mindshare_change_class = "text-success" if mindshare_change_value > 0 else ("text-danger" if mindshare_change_value < 0 else "")
-            
-                # ⭐⭐⭐ [핵심 수정] 이전/현재 마쉐 값을 동적으로 참조하여 변수 정의 (추가/복구) ⭐⭐⭐
+                prev_rank = row.prev_rank
+                curr_rank = row.curr_rank
                 prev_mindshare_value = getattr(row, prev_mindshare_col)
                 curr_mindshare_value = getattr(row, curr_mindshare_col)
-                # ⭐⭐⭐ 수정/복구 끝 ⭐⭐⭐
+                mindshare_change_value = getattr(row, mindshare_change_col)
+                
+                # 순위 변화 및 마쉐 변화 HTML 생성
+                if prev_rank == 9999 and curr_rank != 9999:
+                    rank_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                    mindshare_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                elif prev_rank != 9999 and curr_rank == 9999:
+                    rank_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                    mindshare_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                elif prev_rank != 9999 and curr_rank != 9999:
+                    change = prev_rank - curr_rank
+                    if change > 0:
+                        rank_change_html = f'<span class="text-success" data-order="{change}">↑ {change}</span>'
+                    elif change < 0:
+                        rank_change_html = f'<span class="text-danger" data-order="{change}">↓ {abs(change)}</span>'
+                    else:
+                        rank_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    
+                    # 마쉐 변화
+                    if mindshare_change_value > 0:
+                        mindshare_change_html = f'<span class="text-success" data-order="{mindshare_change_value:.4f}">+{mindshare_change_value:.4f}</span>'
+                    elif mindshare_change_value < 0:
+                        mindshare_change_html = f'<span class="text-danger" data-order="{mindshare_change_value:.4f}">{mindshare_change_value:.4f}</span>'
+                    else:
+                        mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
+                else:
+                    rank_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
+                
                 table_html += f"""
                     <tr>
                         <td>
@@ -968,12 +1221,12 @@ def project_leaderboard(projectname):
                                 </div>
                             </div>
                         </td>
-                        <td>{int(row.prev_rank)}</td>
-                        <td>{int(row.curr_rank)}</td>
-                        <td class="{rank_change_class}">{int(row.rank_change)}</td>
+                        <td>{int(prev_rank) if prev_rank != 9999 else '-'}</td>
+                        <td>{int(curr_rank) if curr_rank != 9999 else '-'}</td>
+                        <td>{rank_change_html}</td>
                         <td>{prev_mindshare_value:.4f}</td>
                         <td>{curr_mindshare_value:.4f}</td>
-                        <td class="{mindshare_change_class}">{row.mindshare_change_display}</td>
+                        <td>{mindshare_change_html}</td>
                     </tr>
                     """
             
@@ -1017,6 +1270,7 @@ def project_leaderboard(projectname):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        timeframe=timeframe,
                        timeframes=dp.timeframes,
                        timestamps=json.dumps(timestamps),
@@ -1201,9 +1455,11 @@ def project_user_analysis(projectname,username):
                 width=None, # 클라이언트 CSS에 너비를 맡김
                 title_text= title,
                 hovermode="x unified", # 툴팁을 통합하여 가독성 향상
-                font=dict(size=12),
+                font=dict(size=12, color='#b8b8b8'),
                 # dragmode="hovermode",
-                showlegend=False
+                showlegend=False,
+                paper_bgcolor='#2d2d2d',
+                plot_bgcolor='#2d2d2d'
             )
             
             # 서브플롯 제목 글꼴 크기 조정
@@ -1259,6 +1515,7 @@ def project_user_analysis(projectname,username):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        username=username,
                        user_chart=user_chart,
                        user_info=user_info,
@@ -1410,6 +1667,7 @@ def wallchain_index(projectname):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        all_users=all_users,
                        timeframe=timeframe,
                        timeframes=available_timeframes)
@@ -1528,9 +1786,36 @@ def wallchain_leaderboard(projectname):
                 """
             
             for i, row in enumerate(compare_data.itertuples(), 1):
-                # 순위 변화에 따른 스타일 설정
-                position_change_class = "text-success" if row.position_change > 0 else ("text-danger" if row.position_change < 0 else "")
-                mindshare_change_class = "text-success" if row.mindshare_change > 0 else ("text-danger" if row.mindshare_change < 0 else "")
+                prev_position = row.prev_position
+                curr_position = row.curr_position
+                
+                # 순위 변화 및 마쉐 변화 HTML 생성
+                if prev_position == 9999 and curr_position != 9999:
+                    position_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                    mindshare_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                elif prev_position != 9999 and curr_position == 9999:
+                    position_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                    mindshare_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                elif prev_position != 9999 and curr_position != 9999:
+                    change = prev_position - curr_position
+                    if change > 0:
+                        position_change_html = f'<span class="text-success" data-order="{change}">↑ {change}</span>'
+                    elif change < 0:
+                        position_change_html = f'<span class="text-danger" data-order="{change}">↓ {abs(change)}</span>'
+                    else:
+                        position_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    
+                    # 마쉐 변화
+                    ms_change = row.mindshare_change
+                    if ms_change > 0:
+                        mindshare_change_html = f'<span class="text-success" data-order="{ms_change:.4f}">+{ms_change:.4f}</span>'
+                    elif ms_change < 0:
+                        mindshare_change_html = f'<span class="text-danger" data-order="{ms_change:.4f}">{ms_change:.4f}</span>'
+                    else:
+                        mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
+                else:
+                    position_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
                 
                 table_html += f"""
                     <tr>
@@ -1543,12 +1828,12 @@ def wallchain_leaderboard(projectname):
                                 </div>
                             </div>
                         </td>
-                        <td>{int(row.prev_position)}</td>
-                        <td>{int(row.curr_position)}</td>
-                        <td class="{position_change_class}">{int(row.position_change)}</td>
+                        <td>{int(prev_position) if prev_position != 9999 else '-'}</td>
+                        <td>{int(curr_position) if curr_position != 9999 else '-'}</td>
+                        <td>{position_change_html}</td>
                         <td>{row.prev_mindshare:.4f}</td>
                         <td>{row.curr_mindshare:.4f}</td>
-                        <td class="{mindshare_change_class}">{row.mindshare_change_display}</td>
+                        <td>{mindshare_change_html}</td>
                     </tr>
                     """
             
@@ -1605,6 +1890,7 @@ def wallchain_leaderboard(projectname):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        timeframe=timeframe,
                        timeframes=available_timeframes,
                        timestamps=json.dumps(timestamps),
@@ -1765,19 +2051,28 @@ def wallchain_user_analysis(projectname, username):
                 )
             
             # 차트 높이를 timeframe 개수에 따라 동적 조정
-            chart_height = 400 * len(available_timeframes)
+            chart_height = 300 * len(available_timeframes)
             
             fig.update_layout(
                 height=chart_height,
                 width=None,
+                title_text='',
                 hovermode="x unified",
-                font=dict(size=12),
-                showlegend=False
+                font=dict(size=12, color='#b8b8b8'),
+                showlegend=False,
+                paper_bgcolor='#2d2d2d',
+                plot_bgcolor='#2d2d2d'
             )
             
             # 서브플롯 제목 글꼴 크기 및 위치 조정
             fig.update_annotations(font_size=30)
             fig.update_annotations(x=0.0, xanchor='left')
+            
+            # Y축 그리드 색상 설정
+            for idx in range(1, len(available_timeframes) + 1):
+                fig.update_yaxes(gridcolor='#3d3d3d', row=idx, col=1, secondary_y=False)
+                fig.update_yaxes(gridcolor='rgba(0,0,0,0)', row=idx, col=1, secondary_y=True)
+                fig.update_xaxes(gridcolor='#3d3d3d', row=idx, col=1)
             
             user_chart = pio.to_html(
                 fig, 
@@ -1812,6 +2107,7 @@ def wallchain_user_analysis(projectname, username):
                        all_wallchain_projects=all_wallchain_projects,
                        grouped_projects=grouped_projects,
                        grouped_wallchain=grouped_wallchain,
+                       kaito_projects=get_cached_kaito_projects(),
                        username=username,
                        user_chart=user_chart,
                        user_info=user_info,
@@ -1824,6 +2120,432 @@ def wallchain_user_analysis(projectname, username):
         return render_error(str(e), projectname)
 
 # ===================== END WALLCHAIN ROUTES =====================
+
+# ===================== KAITO ROUTES =====================
+
+@app.route('/kaito/<projectname>/')
+@app.route('/kaito/<projectname>')
+def kaito_index_route(projectname):
+    """Kaito 프로젝트 인덱스 페이지"""
+    log_access('kaito_index', projectname)
+    
+    if not kaito_processor:
+        return render_error("Kaito 시스템이 초기화되지 않았습니다", projectname)
+    
+    # 프로젝트 존재 확인
+    available_projects = get_cached_kaito_projects()
+    if projectname not in available_projects:
+        return render_error(f"프로젝트 '{projectname}'를 찾을 수 없습니다", projectname)
+    
+    # 모든 timeframe에서 unique한 사용자 목록 가져오기
+    all_users = []
+    try:
+        all_users = kaito_processor.get_all_users(projectname)
+    except Exception as e:
+        print(f"[ERROR] Failed to get users for {projectname}: {e}")
+    
+    # Navbar variables
+    grouped_projects = get_grouped_projects()
+    grouped_wallchain = get_grouped_wallchain_projects()
+    
+    lang = request.get_cookie('lang', 'ko')
+    t = {
+        'user_analysis': '사용자 분석' if lang == 'ko' else 'User Analysis',
+        'leaderboard_analysis': '리더보드 분석' if lang == 'ko' else 'Leaderboard',
+        'copy_success': '지갑 주소가 복사되었습니다! 🦈' if lang == 'ko' else 'Wallet address copied! 🦈',
+        'click_to_copy': '클릭하여 주소 복사 🦈' if lang == 'ko' else 'Click to copy address🦈'
+    }
+    
+    return template('index_kaito', 
+                   projectname=projectname,
+                   project=projectname,
+                   all_users=all_users,
+                   kaito_projects=available_projects,
+                   current_page='user',
+                   is_kaito=True,
+                   lang=lang,
+                   t=t,
+                   grouped_projects=grouped_projects,
+                   grouped_wallchain=grouped_wallchain)
+
+
+@app.route('/kaito/<projectname>/leaderboard')
+def kaito_leaderboard_route(projectname):
+    """Kaito 리더보드 비교 페이지"""
+    log_access('kaito_leaderboard', projectname)
+    
+    if not kaito_processor:
+        return render_error("Kaito 시스템이 초기화되지 않았습니다", projectname)
+    
+    timeframe = request.query.get('timeframe', '7D')
+    timestamp1 = request.query.get('timestamp1', '')
+    timestamp2 = request.query.get('timestamp2', '')
+    
+    # 프로젝트 존재 확인
+    available_projects = get_cached_kaito_projects()
+    if projectname not in available_projects:
+        return render_error(f"프로젝트 '{projectname}'를 찾을 수 없습니다", projectname)
+    
+    # 사용 가능한 timeframes
+    available_timeframes = kaito_processor.get_available_timeframes(projectname)
+    if not available_timeframes:
+        return render_error(f"프로젝트 '{projectname}'의 데이터가 없습니다", projectname)
+    
+    if timeframe not in available_timeframes:
+        timeframe = available_timeframes[0]
+    
+    # 사용 가능한 timestamps 가져오기
+    try:
+        available_timestamps = kaito_processor.get_available_timestamps(projectname, timeframe)
+    except Exception as e:
+        print(f"[ERROR] Failed to get timestamps for {projectname}/{timeframe}: {e}")
+        return render_error(f"타임프레임 '{timeframe}' 데이터를 불러올 수 없습니다", projectname)
+    
+    if not available_timestamps:
+        return render_error(f"프로젝트 '{projectname}'의 '{timeframe}' 데이터가 없습니다", projectname)
+    
+    # 기본값 설정
+    if not timestamp1 or timestamp1 not in available_timestamps:
+        timestamp1 = available_timestamps[-2] if len(available_timestamps) > 1 else available_timestamps[0]
+    if not timestamp2 or timestamp2 not in available_timestamps:
+        timestamp2 = available_timestamps[-1]
+    
+    # 리더보드 비교 데이터 가져오기 및 HTML 테이블 생성
+    table_html = ""
+    if timestamp1 and timestamp2:
+        try:
+            df = kaito_processor.compare_leaderboards(projectname, timestamp1, timestamp2, timeframe)
+            
+            if not df.empty:
+                lang = request.get_cookie('lang', 'ko')
+                
+                if lang == 'ko':
+                    table_html = """
+                    <table id="leaderboardTable" class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>사용자</th>
+                                <th>이전 순위</th>
+                                <th>현재 순위</th>
+                                <th>순위 변화</th>
+                                <th>이전 마쉐</th>
+                                <th>현재 마쉐</th>
+                                <th>마쉐 변화</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+                else:
+                    table_html = """
+                    <table id="leaderboardTable" class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Pre Rank</th>
+                                <th>Cur Rank</th>
+                                <th>Rank Change</th>
+                                <th>Pre MS</th>
+                                <th>Cur MS</th>
+                                <th>MS Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+                
+                for row in df.itertuples():
+                    prev_rank = row.prev_rank
+                    curr_rank = row.curr_rank
+                    
+                    # 순위 변화 계산 및 표시
+                    if prev_rank == 9999 and curr_rank != 9999:
+                        rank_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                        ms_change_html = '<span class="badge bg-success" data-order="0">NEW</span>'
+                    elif prev_rank != 9999 and curr_rank == 9999:
+                        rank_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                        ms_change_html = '<span class="badge bg-secondary" data-order="0">OUT</span>'
+                    elif prev_rank != 9999 and curr_rank != 9999:
+                        change = prev_rank - curr_rank
+                        if change > 0:
+                            rank_change_html = f'<span class="text-success" data-order="{change}">↑ {change}</span>'
+                        elif change < 0:
+                            rank_change_html = f'<span class="text-danger" data-order="{change}">↓ {abs(change)}</span>'
+                        else:
+                            rank_change_html = '<span class="text-muted" data-order="0">-</span>'
+                        
+                        # Mindshare 변화 계산
+                        try:
+                            prev_ms = float(row.prev_mindshare.rstrip('%'))
+                            curr_ms = float(row.curr_mindshare.rstrip('%'))
+                            ms_change = curr_ms - prev_ms
+                            if ms_change > 0:
+                                ms_change_html = f'<span class="text-success" data-order="{ms_change:.2f}">+{ms_change:.2f}%</span>'
+                            elif ms_change < 0:
+                                ms_change_html = f'<span class="text-danger" data-order="{ms_change:.2f}">{ms_change:.2f}%</span>'
+                            else:
+                                ms_change_html = '<span class="text-muted" data-order="0">-</span>'
+                        except:
+                            ms_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    else:
+                        rank_change_html = '<span class="text-muted" data-order="0">-</span>'
+                        ms_change_html = '<span class="text-muted" data-order="0">-</span>'
+                    
+                    # 프로필 이미지 URL
+                    image_url = f"https://pbs.twimg.com/profile_images/{row.imageId}/large.jpg" if row.imageId else ""
+                    image_tag = f'<img src="{image_url}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;" onerror="this.style.display=\'none\'">' if image_url else ""
+                    
+                    table_html += f"""
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {image_tag}
+                                    <div>
+                                        <strong>{row.displayName}</strong><br>
+                                        <small class="text-muted">{row.handle}</small><a href="/kaito/{projectname}/user/{row.handle}" class="user-link" title="유저 분석">🔍</a>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{prev_rank if prev_rank != 9999 else '-'}</td>
+                            <td>{curr_rank if curr_rank != 9999 else '-'}</td>
+                            <td>{rank_change_html}</td>
+                            <td>{row.prev_mindshare}</td>
+                            <td>{row.curr_mindshare}</td>
+                            <td>{ms_change_html}</td>
+                        </tr>
+                    """
+                
+                table_html += """
+                    </tbody>
+                </table>
+                """
+            else:
+                table_html = "<p>데이터가 없습니다.</p>"
+        except Exception as e:
+            print(f"[ERROR] Failed to compare leaderboards: {e}")
+            table_html = "<p>데이터를 불러오는 중 오류가 발생했습니다.</p>"
+    
+    # timestamp 포맷팅 (YYYY-MM-DD HH:MM 형식)
+    formatted_timestamps = {}
+    for ts in available_timestamps:
+        try:
+            # 2026-0102-190000 -> 2026-01-02 19:00
+            clean_ts = ts.replace('-', '').replace('_', '')
+            dt = pd.to_datetime(clean_ts, format='%Y%m%d%H%M%S')
+            formatted_timestamps[ts] = dt.strftime('%Y-%m-%d %H:%M')
+        except:
+            formatted_timestamps[ts] = ts
+    
+    timestamp1_display = formatted_timestamps.get(timestamp1, timestamp1)
+    timestamp2_display = formatted_timestamps.get(timestamp2, timestamp2)
+    
+    # Navbar variables
+    grouped_projects = get_grouped_projects()
+    grouped_wallchain = get_grouped_wallchain_projects()
+    
+    lang = request.get_cookie('lang', 'ko')
+    
+    return template('leaderboard_kaito',
+                   projectname=projectname,
+                   project=projectname,
+                   display_project_name=f"🤖 {projectname}",
+                   timeframe=timeframe,
+                   timeframes=available_timeframes,
+                   timestamp1=timestamp1,
+                   timestamp2=timestamp2,
+                   timestamp1_display=timestamp1_display,
+                   timestamp2_display=timestamp2_display,
+                   available_timestamps=available_timestamps,
+                   timestamps=json.dumps(available_timestamps),
+                   formatted_timestamps=json.dumps(formatted_timestamps),
+                   table_html=table_html,
+                   kaito_projects=available_projects,
+                   current_page='leaderboard',
+                   is_kaito=True,
+                   lang=lang,
+                   grouped_projects=grouped_projects,
+                   grouped_wallchain=grouped_wallchain)
+
+
+@app.route('/kaito/<projectname>/user/<handle>')
+def kaito_user_route(projectname, handle):
+    """Kaito 사용자 분석 페이지"""
+    log_access('kaito_user', f"{projectname}/{handle}")
+    
+    if not kaito_processor:
+        return render_error("Kaito 시스템이 초기화되지 않았습니다", projectname)
+    
+    # 프로젝트 존재 확인
+    available_projects = get_cached_kaito_projects()
+    if projectname not in available_projects:
+        return render_error(f"프로젝트 '{projectname}'를 찾을 수 없습니다", projectname)
+    
+    # 사용자 기본 정보 가져오기
+    user_info = kaito_processor.get_user_info(projectname, handle)
+    if not user_info:
+        return render_error(f"사용자 '{handle}'를 찾을 수 없습니다", projectname)
+    
+    # 사용 가능한 timeframe 목록
+    available_timeframes = kaito_processor.get_available_timeframes(projectname)
+    
+    # timeframe별 사용자 데이터 수집 (차트용)
+    user_data_by_timeframe = {}
+    user_info_by_timeframe = {}
+    
+    for tf in available_timeframes:
+        try:
+            df = kaito_processor.get_user_data(projectname, handle, tf)
+            if not df.empty:
+                user_data_by_timeframe[tf] = df
+                # 최신 데이터
+                latest_row = df.iloc[-1]
+                user_info_by_timeframe[tf] = {
+                    'rank': latest_row['rank'],
+                    'mindshare': latest_row['mindshare']
+                }
+        except Exception as e:
+            print(f"[ERROR] Failed to get data for {handle} in {tf}: {e}")
+    
+    # 데이터가 있는 timeframe만 사용
+    timeframes_with_data = list(user_data_by_timeframe.keys())
+    
+    # Plotly 차트 생성 (데이터가 있는 timeframe만)
+    if not timeframes_with_data:
+        user_chart = ""
+    else:
+        fig = make_subplots(
+            rows=len(timeframes_with_data), cols=1,
+            subplot_titles=[f'{tf}' for tf in timeframes_with_data],
+            vertical_spacing=0.12,
+            specs=[[{"secondary_y": True}] for _ in timeframes_with_data]
+        )
+        
+        for idx, tf in enumerate(timeframes_with_data, 1):
+            df = user_data_by_timeframe[tf]
+            timestamps = df['timestamp'].tolist()
+            ranks = df['rank'].tolist()
+            mindshares = df['mindshare'].str.rstrip('%').astype(float).tolist()
+            
+            # Rank (primary y-axis, reversed)
+            fig.add_trace(
+                go.Scatter(
+                    x=timestamps, 
+                    y=ranks, 
+                    mode='lines+markers', 
+                    name='Rank',
+                    line=dict(width=1, color='#FF0000'),
+                    marker=dict(size=2, symbol='circle'),
+                    showlegend=False
+                ),
+                row=idx, col=1, secondary_y=False
+            )
+            
+            # Mindshare (secondary y-axis)
+            fig.add_trace(
+                go.Scatter(
+                    x=timestamps, 
+                    y=mindshares, 
+                    mode='lines+markers', 
+                    name='Mindshare',
+                    line=dict(width=1, color='#1F77B4', dash='dot'),
+                    marker=dict(size=2, symbol='square'),
+                    showlegend=False
+                ),
+                row=idx, col=1, secondary_y=True
+            )
+            
+            # Y축 설정
+            fig.update_yaxes(
+                title_text="Rank", 
+                autorange="reversed",
+                row=idx, col=1, secondary_y=False,
+                gridcolor='lightgray',
+                zeroline=True,
+                fixedrange=True
+            )
+            
+            fig.update_yaxes(
+                title_text="Mindshare (%)",
+                row=idx, col=1, secondary_y=True,
+                gridcolor='rgba(0,0,0,0)',
+                fixedrange=True
+            )
+            
+            fig.update_xaxes(
+                row=idx, col=1,
+                fixedrange=True
+            )
+        
+        chart_height = 300 * len(timeframes_with_data)
+        
+        fig.update_layout(
+            height=chart_height,
+            width=None,
+            hovermode="x unified",
+            font=dict(size=12),
+            showlegend=False
+        )
+        
+        fig.update_annotations(font_size=30)
+        fig.update_annotations(
+            x=0.0,
+            xanchor='left'
+        )
+        
+        user_chart = pio.to_html(
+            fig,
+            full_html=False,
+            include_plotlyjs='cdn',
+            config={
+                'responsive': True,
+                'staticPlot': False,
+                'displayModeBar': True,
+                'displaylogo': False,
+                'modeBarButtonsToRemove': [
+                    'zoom2d',
+                    'pan2d',
+                    'select2d',
+                    'lasso2d',
+                    'zoomIn2d',
+                    'zoomOut2d',
+                    'autoscale',
+                    'resetScale2d'
+                ]
+            }
+        )
+    
+    # Navbar variables
+    grouped_projects = get_grouped_projects()
+    grouped_wallchain = get_grouped_wallchain_projects()
+    
+    lang = request.get_cookie('lang', 'ko')
+    t = {
+        'user_analysis': '사용자 분석' if lang == 'ko' else 'User Analysis',
+        'leaderboard_analysis': '리더보드 분석' if lang == 'ko' else 'Leaderboard',
+        'copy_success': '지갑 주소가 복사되었습니다! 🦈' if lang == 'ko' else 'Wallet address copied! 🦈',
+        'click_to_copy': '클릭하여 주소 복사 🦈' if lang == 'ko' else 'Click to copy address🦈',
+        'rank': '순위' if lang == 'ko' else 'Rank',
+        'mindshare': '마인드쉐어' if lang == 'ko' else 'Mindshare',
+        'followers': '팔로워' if lang == 'ko' else 'Followers',
+        'smart_followers': '스마트 팔로워' if lang == 'ko' else 'Smart Followers',
+        'chart_title': '순위 및 마인드쉐어 변화 분석' if lang == 'ko' else 'Rank & Mindshare Analysis'
+    }
+    
+    return template('user_kaito',
+                   projectname=projectname,
+                   project=projectname,
+                   handle=handle,
+                   user_info=user_info,
+                   user_info_by_timeframe=user_info_by_timeframe,
+                   timeframes=available_timeframes,
+                   user_chart=user_chart,
+                   kaito_projects=available_projects,
+                   current_page='user',
+                   is_kaito=True,
+                   lang=lang,
+                   t=t,
+                   grouped_projects=grouped_projects,
+                   grouped_wallchain=grouped_wallchain)
+
+# ===================== END KAITO ROUTES =====================
         
 # 404 에러 핸들러 추가 (main.py)
 @app.error(404)
@@ -1865,10 +2587,18 @@ if __name__ == '__main__':
     wallchain_init_thread.start()
     print("🌊 Wallchain 프로젝트 초기화를 백그라운드에서 진행합니다...")
     
-    # 3. 새 프로젝트 스캔 스레드 시작
+    # 3. Kaito 프로젝트 초기화 및 데이터 로더 시작
+    try:
+        init_kaito_on_startup()
+        start_kaito_data_loader()
+        print("🎯 Kaito 프로젝트 초기화 및 데이터 로더 시작...")
+    except Exception as e:
+        print(f"⚠️ Kaito 초기화 오류: {e}")
+    
+    # 4. 새 프로젝트 스캔 스레드 시작
     scan_for_new_projects()
     
-    # 4. 글로벌 DB 갱신 스케줄러 시작
+    # 5. 글로벌 DB 갱신 스케줄러 시작
     schedule_global_updates()
     print("🔄 글로벌 DB 갱신 스케줄러가 시작되었습니다...")
     

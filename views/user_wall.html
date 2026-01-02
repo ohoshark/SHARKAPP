@@ -48,7 +48,7 @@
             <div class="row align-items-center">
                 <div class="col-auto">
                     % if user_info.get('imageUrl'):
-                        <img src="{{ user_info['imageUrl'] }}" alt="{{ user_info.get('name', username) }}" style="width: 80px; height: 80px; border-radius: 50%;">
+                        <img src="{{ user_info['imageUrl'] }}" alt="{{ user_info.get('name', username) }}" style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
                     % end
                 </div>
                 <div class="col">

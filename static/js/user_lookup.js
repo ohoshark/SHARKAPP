@@ -41,7 +41,7 @@ searchInput.addEventListener('input', function() {
                 
                 autocompleteDropdown.innerHTML = data.map(user => `
                     <div class="autocomplete-item" data-username="${user.infoName}">
-                        ${user.imageUrl ? `<img src="${user.imageUrl}" alt="${user.displayName || user.infoName}">` : ''}
+                        ${user.imageUrl ? `<img src="${user.imageUrl}" alt="${user.displayName || user.infoName}" onerror="this.style.display='none'">` : ''}
                         <div>
                             <strong>${user.displayName || user.infoName}</strong>
                             <div class="text-muted">@${user.infoName}</div>
@@ -182,8 +182,11 @@ function sortTimeframes(rankings) {
     const knownOrder = {
         '7D': 1, '7d': 1, 
         '14D': 2, '14d': 2, 
-        '30D': 3, '30d': 3, 
-        'TOTAL': 4, 'total': 4
+        '30D': 3, '30d': 3,
+        '90D': 4, '90d': 4,
+        '180D': 5, '180d': 5,
+        '360D': 6, '360d': 6,
+        'TOTAL': 7, 'total': 7
     };
     
     return rankings.sort((a, b) => {
@@ -242,7 +245,7 @@ function renderUserData(data) {
                     ${user.imageUrl ? `
                         <div class="col-auto">
                             <img src="${user.imageUrl}" alt="${user.displayName}" 
-                                 style="width: 80px; height: 80px; border-radius: 50%;">
+                                 style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
                         </div>
                     ` : ''}
                     <div class="col">
@@ -256,7 +259,12 @@ function renderUserData(data) {
                               @${user.infoName}
                             </a>
                         </p>
-                        ${user.wal_score ? `<p class="mb-0"><strong>X Score</strong> ${user.wal_score.toLocaleString()}</p>` : ''}
+                        <div class="d-flex gap-4 flex-wrap">
+                            ${user.follower ? `<div><small class="text-muted d-block">Followers</small><strong>${user.follower.toLocaleString()}</strong></div>` : ''}
+                            ${user.kaito_smart_follower ? `<div><small class="text-muted d-block">🤖 Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>` : ''}
+                            ${user.cookie_smart_follower ? `<div><small class="text-muted d-block">🍪 Smart Followers</small><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>` : ''}
+                            ${user.wal_score ? `<div><small class="text-muted d-block">🦆 X SCORE</small><strong>${user.wal_score.toLocaleString()}</strong></div>` : ''}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -365,10 +373,43 @@ function renderUserData(data) {
         });
     }
     
+    // Kaito 프로젝트
+    if (data.kaito_projects && Object.keys(data.kaito_projects).length > 0) {
+        Object.keys(data.kaito_projects).sort().forEach(projectName => {
+            const rankings = sortTimeframes(data.kaito_projects[projectName]);
+            const projectShortName = projectName.replace('kaito-', '');
+            const displayName = projectShortName.toUpperCase();
+            
+            // 순위가 없으면 카드를 표시하지 않음
+            if (rankings.length === 0) {
+                return;
+            }
+            
+            html += `<div class="card project-card kaito-card">
+                <div class="card-body">
+                    <span class="project-type-icon kaito">🤖</span>
+                    <a href="/kaito/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
+                    <div class="timeframe-container">`;
+            
+            rankings.forEach(r => {
+                const displayTimeframe = r.timeframe;
+                
+                html += `<span class="timeframe-badge">
+                    <span class="timeframe-label">${displayTimeframe}</span>
+                    <span class="rank-info">#${r.msRank}</span>
+                    <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
+                </span>`;
+            });
+            
+            html += `</div></div></div>`;
+        });
+    }
+    
     // 그리드 닫기
     html += `</div>`;
     
-    if (Object.keys(data.cookie_projects).length === 0 && Object.keys(data.wallchain_projects).length === 0) {
+    if (Object.keys(data.cookie_projects).length === 0 && Object.keys(data.wallchain_projects).length === 0 && (!data.kaito_projects || Object.keys(data.kaito_projects).length === 0)) {
         html += `<div class="alert alert-info">이 사용자는 어떤 프로젝트에도 없습니다.</div>`;
     }
     
