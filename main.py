@@ -740,8 +740,11 @@ def update_global_rankings():
                                 existing = users_batch[handle]
                                 # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
                                 final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
+                                # kaito_smart_follower와 follower는 None이 아닌 경우에만 업데이트
+                                final_kaito_smart = smart_follower if smart_follower is not None else existing[5]
+                                final_follower = follower if follower is not None else existing[6]
                                 users_batch[handle] = (handle, existing[1], final_image, existing[3],
-                                                      existing[4], smart_follower, follower)  # kaito_smart와 follower 업데이트
+                                                      existing[4], final_kaito_smart, final_follower)
                             else:
                                 # 없으면 새로 추가
                                 users_batch[handle] = (handle, display_name, image_url, None,
@@ -1724,7 +1727,7 @@ def wallchain_leaderboard(projectname):
                 # max(0, num_ts - 9)를 사용하면 데이터가 5개뿐일 때 -4가 아닌 0번 인덱스를 잡습니다.
                 try:
                     # 원래 의도하신 -2 인덱스 시도
-                    timestamp1 = timestamps[-2]
+                    timestamp1 = timestamps[-4]
                 except IndexError:
                     # -9가 없을 경우, 리스트의 가장 첫 번째([0]) 데이터를 선택 (최대 가용 범위)
                     timestamp1 = timestamps[0]
@@ -2206,7 +2209,7 @@ def kaito_leaderboard_route(projectname):
     
     # 기본값 설정
     if not timestamp1 or timestamp1 not in available_timestamps:
-        timestamp1 = available_timestamps[-2] if len(available_timestamps) > 1 else available_timestamps[0]
+        timestamp1 = available_timestamps[-3] if len(available_timestamps) > 1 else available_timestamps[0]
     if not timestamp2 or timestamp2 not in available_timestamps:
         timestamp2 = available_timestamps[-1]
     

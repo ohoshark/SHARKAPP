@@ -297,7 +297,7 @@
 			// 화살표와 특수문자 제거 후 숫자 추출
 			let num = data.replace(/<[^>]*>/g, '').replace(/[↑↓,+%\s-]/g, '');
 			if (num === '' || isNaN(num)) {
-				return 0;
+				return 9999;
 			}
 			return parseFloat(num);
 		};
@@ -333,7 +333,7 @@
 					"order": [[2, 'asc']], 
 					"columnDefs": [
 						{ "orderable": false, "targets": 0 },
-						{ "type": "special-num", "targets": [3, 6] }
+						{ "type": "special-num", "targets": [1,2,3,4,5,6] }
 					]
 				});
 				

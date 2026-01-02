@@ -351,7 +351,7 @@ function renderUserData(data) {
             rankings.forEach(r => {
                 const changeIcon = r.positionChange > 0 ? '↑' : r.positionChange < 0 ? '↓' : '';
                 const changeColor = r.positionChange > 0 ? 'success' : r.positionChange < 0 ? 'danger' : 'secondary';
-                const displayTimeframe = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2');
+                const displayTimeframe = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2').replace('epoch-1', 'epoch1');
                 
                 let changeDisplay = '';
                 if (r.positionChange !== null) {

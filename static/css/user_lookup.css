@@ -190,7 +190,7 @@ html.dark-mode .user-detail-link {
 
 .timeframe-badge {
     display: grid;
-    grid-template-columns: 45px 1fr auto;
+    grid-template-columns: 48px 1fr auto;
     gap: 8px;
     align-items: center;
     padding: 6px 10px;
