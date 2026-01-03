@@ -21,7 +21,7 @@
                     % if kaito_projects:
                         <li>
                             <a class="dropdown-header text-warning fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#kaitoProjectModal" onclick="event.stopPropagation();">
-                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🤖 Kaito<i class="fas fa-chevron-right" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;"><img src="./static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> Kaito<i class="fas fa-chevron-right" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                     % end
@@ -195,7 +195,7 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="kaitoProjectModalLabel">🤖 Kaito 프로젝트 선택 ({{len(kaito_projects)}}개)</h5>
+                <h5 class="modal-title" id="kaitoProjectModalLabel"><img src="./static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> KAITO 프로젝트 선택 ({{len(kaito_projects)}}개)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">

@@ -179,6 +179,10 @@ html.dark-mode .user-detail-link {
     width: 48px;
     height: 48px;
     font-size: 2.2rem;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .timeframe-container {

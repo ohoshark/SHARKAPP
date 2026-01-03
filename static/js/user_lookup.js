@@ -136,6 +136,14 @@ document.addEventListener('click', function(e) {
     }
 });
 
+// 검색창 클릭 시 내용 지우기
+searchInput.addEventListener('focus', function() {
+    // 검색 결과가 표시된 상태에서만 클릭 시 지우기
+    if (searchResults.innerHTML && !searchResults.innerHTML.includes('spinner-border')) {
+        this.value = '';
+    }
+});
+
 // 검색 버튼 클릭
 searchButton.addEventListener('click', function() {
     let username = searchInput.value.trim();
@@ -151,6 +159,9 @@ searchButton.addEventListener('click', function() {
 // 사용자 데이터 로드
 function loadUserData(username) {
     searchResults.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+    
+    // 검색창에 검색한 유저 이름 표시
+    searchInput.value = username;
     
     // URL에 username 추가
     const url = new URL(window.location);
@@ -325,6 +336,39 @@ function renderUserData(data) {
     // 모든 프로젝트를 하나의 그리드에 표시
     html += `<div class="projects-grid">`;
     
+    // Kaito 프로젝트 (최우선)
+    if (data.kaito_projects && Object.keys(data.kaito_projects).length > 0) {
+        Object.keys(data.kaito_projects).sort().forEach(projectName => {
+            const rankings = sortTimeframes(data.kaito_projects[projectName]);
+            const projectShortName = projectName.replace('kaito-', '');
+            const displayName = projectShortName.toUpperCase();
+            
+            // 순위가 없으면 카드를 표시하지 않음
+            if (rankings.length === 0) {
+                return;
+            }
+            
+            html += `<div class="card project-card kaito-card">
+                <div class="card-body">
+                    <span class="project-type-icon kaito"><img src="/static/kaito.png" alt="Kaito" style="width: 70%; height: 70%; object-fit: contain;"></span>
+                    <a href="/kaito/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
+                    <div class="timeframe-container">`;
+            
+            rankings.forEach(r => {
+                const displayTimeframe = r.timeframe;
+                
+                html += `<span class="timeframe-badge">
+                    <span class="timeframe-label">${displayTimeframe}</span>
+                    <span class="rank-info">#${r.msRank}</span>
+                    <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
+                </span>`;
+            });
+            
+            html += `</div></div></div>`;
+        });
+    }
+    
     // Cookie 프로젝트
     if (Object.keys(data.cookie_projects).length > 0) {
         Object.keys(data.cookie_projects).sort().forEach(projectName => {
@@ -416,39 +460,6 @@ function renderUserData(data) {
                 html += `<span class="timeframe-badge">
                     <span class="timeframe-label">${displayTimeframe}</span>
                     <span class="rank-info">#${r.msRank} ${changeDisplay}</span>
-                    <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
-                </span>`;
-            });
-            
-            html += `</div></div></div>`;
-        });
-    }
-    
-    // Kaito 프로젝트
-    if (data.kaito_projects && Object.keys(data.kaito_projects).length > 0) {
-        Object.keys(data.kaito_projects).sort().forEach(projectName => {
-            const rankings = sortTimeframes(data.kaito_projects[projectName]);
-            const projectShortName = projectName.replace('kaito-', '');
-            const displayName = projectShortName.toUpperCase();
-            
-            // 순위가 없으면 카드를 표시하지 않음
-            if (rankings.length === 0) {
-                return;
-            }
-            
-            html += `<div class="card project-card kaito-card">
-                <div class="card-body">
-                    <span class="project-type-icon kaito">🤖</span>
-                    <a href="/kaito/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
-                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
-                    <div class="timeframe-container">`;
-            
-            rankings.forEach(r => {
-                const displayTimeframe = r.timeframe;
-                
-                html += `<span class="timeframe-badge">
-                    <span class="timeframe-label">${displayTimeframe}</span>
-                    <span class="rank-info">#${r.msRank}</span>
                     <span class="percent-info">${r.ms ? `${r.ms.toFixed(3)}%` : ''}</span>
                 </span>`;
             });
