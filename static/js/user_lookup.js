@@ -274,7 +274,7 @@ function renderUserData(data) {
     
     // 2. 스마트 팔로워
     if (user.kaito_smart_follower) {
-        stats.push(`<div><small class="text-muted d-block">🤖 Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
+        stats.push(`<div><small class="text-muted d-block"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
     }
     if (user.cookie_smart_follower) {
         stats.push(`<div><small class="text-muted d-block">🍪 Smart Followers</small><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
