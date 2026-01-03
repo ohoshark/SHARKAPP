@@ -12,6 +12,7 @@ import threading
 import time
 import signal
 import sys
+import requests
 from datetime import datetime
 from data_processor import DataProcessor
 from data_processor_wallchain import DataProcessorWallchain
@@ -49,6 +50,10 @@ CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 LOG_BUFFER = []
 LOG_BUFFER_SIZE = 100  # 100개 쌓이면 파일에 쓰기
 LOG_LOCK = threading.Lock()
+
+# YAPS 캐시 (동일 사용자 5분간 캐시)
+YAPS_CACHE = {}  # {username: {'data': {...}, 'timestamp': time.time()}}
+YAPS_CACHE_DURATION = 300  # 5분 (초 단위)
 
 # Kaito DB 쓰기 Lock (병렬 처리 시 동시 쓰기 방지)
 KAITO_DB_LOCK = threading.Lock()
@@ -607,6 +612,48 @@ def send_static(filename):
     response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
     return res
 
+@app.route('/kaito-img/<imageid>')
+def kaito_image_proxy(imageid):
+    """
+    Kaito 이미지 프록시 - 서버에 캐싱하여 제공
+    1. static/kaito/ 폴더에 이미지가 있는지 확인
+    2. 없으면 Kaito API에서 다운로드하여 저장
+    3. 저장된 이미지 반환
+    """
+    kaito_dir = './static/kaito'
+    os.makedirs(kaito_dir, exist_ok=True)
+    
+    image_path = os.path.join(kaito_dir, f"{imageid}.jpg")
+    
+    # 1. 이미 저장된 이미지가 있는지 확인
+    if os.path.exists(image_path):
+        # 캐시된 이미지 반환
+        res = static_file(f"{imageid}.jpg", root=kaito_dir)
+        response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
+        return res
+    
+    # 2. 없으면 Kaito API에서 다운로드
+    try:
+        api_url = f"https://img.kaito.ai/v1/https%253A%252F%252Fasset.cdn.kaito.ai%252Ftwitter-user-profile-img-large%252F{imageid}.jpg%253F1767427200000/w=64&q=90"
+        img_response = requests.get(api_url, timeout=10, stream=True)
+        
+        if img_response.status_code == 200:
+            # 이미지를 서버에 저장
+            with open(image_path, 'wb') as f:
+                for chunk in img_response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            
+            # 저장된 이미지 반환
+            res = static_file(f"{imageid}.jpg", root=kaito_dir)
+            response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
+            return res
+        else:
+            # API 오류 시 404 반환
+            abort(404)
+    except Exception as e:
+        print(f"[Kaito Image Proxy Error] {imageid}: {e}")
+        abort(404)
+
 @app.route('/robots.txt')
 def robots():
     return static_file('robots.txt', root='./static')
@@ -1050,6 +1097,59 @@ def api_user_search():
     except Exception as e:
         print(f"[API Error] user-search: {e}")
         return json.dumps([], ensure_ascii=False)
+
+def fetch_yaps_data(username):
+    """Kaito YAPS API에서 사용자 YAPS 데이터 가져오기 (캐싱 포함)"""
+    current_time = time.time()
+    
+    # 캐시 확인
+    if username in YAPS_CACHE:
+        cached = YAPS_CACHE[username]
+        if current_time - cached['timestamp'] < YAPS_CACHE_DURATION:
+            # print(f"[YAPS Cache Hit] {username}")
+            return cached['data']
+    
+    # 캐시 미스 - API 호출
+    try:
+        url = f"https://api.kaito.ai/api/v1/yaps?username={username}"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            result = {
+                'yaps_all': data.get('yaps_all'),
+                'yaps_l24h': data.get('yaps_l24h'),
+                'yaps_l48h': data.get('yaps_l48h'),
+                'yaps_l7d': data.get('yaps_l7d'),
+                'yaps_l30d': data.get('yaps_l30d'),
+                'yaps_l3m': data.get('yaps_l3m'),
+                'yaps_l6m': data.get('yaps_l6m'),
+                'yaps_l12m': data.get('yaps_l12m')
+            }
+            # 캐시 저장
+            YAPS_CACHE[username] = {'data': result, 'timestamp': current_time}
+            # print(f"[YAPS API Call] {username} - cached for 5min")
+            return result
+        else:
+            return None
+    except Exception as e:
+        print(f"[YAPS API Error] {username}: {e}")
+        return None
+
+@app.route('/api/yaps/<username>')
+def api_yaps(username):
+    """YAPS 데이터 프록시 API (캐싱으로 API 호출 최소화)"""
+    response.content_type = 'application/json; charset=utf-8'
+    
+    try:
+        yaps_data = fetch_yaps_data(username)
+        if yaps_data:
+            return json.dumps(yaps_data, ensure_ascii=False)
+        else:
+            return json.dumps({'error': 'YAPS data not available'}, ensure_ascii=False)
+    except Exception as e:
+        print(f"[API Error] yaps: {e}")
+        return json.dumps({'error': str(e)}, ensure_ascii=False)
 
 @app.route('/api/user-data/<username>')
 def api_user_data(username):
@@ -2368,8 +2468,8 @@ def kaito_leaderboard_route(projectname):
                         rank_change_html = '<span class="text-muted" data-order="0">-</span>'
                         ms_change_html = '<span class="text-muted" data-order="0">-</span>'
                     
-                    # 프로필 이미지 URL
-                    image_url = f"https://pbs.twimg.com/profile_images/{row.imageId}/large.jpg" if row.imageId else ""
+                    # 프로필 이미지 URL (서버 프록시 사용)
+                    image_url = f"/kaito-img/{row.imageId}" if row.imageId else ""
                     image_tag = f'<img src="{image_url}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;" onerror="this.style.display=\'none\'">' if image_url else ""
                     
                     table_html += f"""
@@ -2461,6 +2561,12 @@ def kaito_user_route(projectname, handle):
     user_info = kaito_processor.get_user_info(projectname, handle)
     if not user_info:
         return render_error(f"사용자 '{handle}'를 찾을 수 없습니다", projectname)
+    
+    # YAPS 데이터 가져오기 (캐싱 포함)
+    yaps_data = fetch_yaps_data(handle)
+    if yaps_data:
+        user_info['yaps_all'] = yaps_data.get('yaps_all')
+        user_info['yaps_l30d'] = yaps_data.get('yaps_l30d')
     
     # 사용 가능한 timeframe 목록
     available_timeframes = kaito_processor.get_available_timeframes(projectname)

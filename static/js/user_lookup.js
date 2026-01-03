@@ -39,15 +39,24 @@ searchInput.addEventListener('input', function() {
                     return;
                 }
                 
-                autocompleteDropdown.innerHTML = data.map(user => `
-                    <div class="autocomplete-item" data-username="${user.infoName}">
-                        ${user.imageUrl ? `<img src="${user.imageUrl}" alt="${user.displayName || user.infoName}" onerror="this.style.display='none'">` : ''}
-                        <div>
-                            <strong>${user.displayName || user.infoName}</strong>
-                            <div class="text-muted">@${user.infoName}</div>
+                autocompleteDropdown.innerHTML = data.map(user => {
+                    // Kaito 이미지 ID 감지 (숫자만 있는 경우)
+                    let imageUrl = user.imageUrl;
+                    if (imageUrl && /^\d+$/.test(imageUrl)) {
+                        // 숫자만 있으면 Kaito 이미지 ID로 간주하고 서버 프록시 사용
+                        imageUrl = `/kaito-img/${imageUrl}`;
+                    }
+                    
+                    return `
+                        <div class="autocomplete-item" data-username="${user.infoName}">
+                            ${imageUrl ? `<img src="${imageUrl}" alt="${user.displayName || user.infoName}" onerror="this.style.display='none'">` : ''}
+                            <div>
+                                <strong>${user.displayName || user.infoName}</strong>
+                                <div class="text-muted">@${user.infoName}</div>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
                 
                 autocompleteDropdown.style.display = 'block';
                 
@@ -148,15 +157,15 @@ function loadUserData(username) {
     url.searchParams.set('username', username);
     window.history.pushState({}, '', url);
     
-    fetch(`/api/user-data/${encodeURIComponent(username)}`)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (!data || data.error) {
+    // 사용자 데이터와 YAPS 데이터를 병렬로 가져오기 (서버 프록시 사용)
+    Promise.all([
+        fetch(`/api/user-data/${encodeURIComponent(username)}`).then(res => res.json()),
+        fetch(`/api/yaps/${encodeURIComponent(username)}`)
+            .then(res => res.json())
+            .catch(() => null) // YAPS API 실패 시 무시
+    ])
+        .then(([userData, yapsData]) => {
+            if (!userData || userData.error) {
                 searchResults.innerHTML = `
                     <div class="alert alert-warning text-center">
                         <i class="fas fa-exclamation-triangle"></i> 사용자의 정보가 존재하지 않습니다
@@ -165,7 +174,12 @@ function loadUserData(username) {
                 return;
             }
             
-            renderUserData(data);
+            // YAPS 데이터를 사용자 데이터에 추가
+            if (yapsData && !yapsData.error) {
+                userData.yaps = yapsData;
+            }
+            
+            renderUserData(userData);
         })
         .catch(err => {
             searchResults.innerHTML = `
@@ -238,13 +252,53 @@ function formatCookieProjectName(projectName, suffix) {
 // 사용자 데이터 렌더링
 function renderUserData(data) {
     const user = data.user;
+    
+    // 통계 데이터 배열 생성 (우선순위: 팔로워 > 스마트 팔로워 > YAPS > X Score)
+    const stats = [];
+    
+    // 1. 팔로워 (최우선)
+    if (user.follower) {
+        stats.push(`<div><small class="text-muted d-block">Followers</small><strong>${user.follower.toLocaleString()}</strong></div>`);
+    }
+    
+    // 2. 스마트 팔로워
+    if (user.kaito_smart_follower) {
+        stats.push(`<div><small class="text-muted d-block">🤖 Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
+    }
+    if (user.cookie_smart_follower) {
+        stats.push(`<div><small class="text-muted d-block">🍪 Smart Followers</small><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
+    }
+    
+    // 3. YAPS (새로 추가)
+    if (data.yaps) {
+        // YAPS 데이터 중 의미있는 값만 표시
+        if (data.yaps.yaps_all !== null && data.yaps.yaps_all !== undefined) {
+            stats.push(`<div><small class="text-muted d-block">🎯 YAPS (All)</small><strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
+        }
+        if (data.yaps.yaps_l30d !== null && data.yaps.yaps_l30d !== undefined && data.yaps.yaps_l30d > 0) {
+            stats.push(`<div><small class="text-muted d-block">🎯 YAPS (30D)</small><strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
+        }
+    }
+    
+    // 4. X Score (마지막)
+    if (user.wal_score) {
+        stats.push(`<div><small class="text-muted d-block">🦆 X SCORE</small><strong>${user.wal_score.toLocaleString()}</strong></div>`);
+    }
+    
+    // Kaito 이미지 ID 감지 (숫자만 있는 경우)
+    let imageUrl = user.imageUrl;
+    if (imageUrl && /^\d+$/.test(imageUrl)) {
+        // 숫자만 있으면 Kaito 이미지 ID로 간주하고 서버 프록시 사용
+        imageUrl = `/kaito-img/${imageUrl}`;
+    }
+    
     let html = `
         <div class="card shadow-sm mb-4">
             <div class="card-body">
                 <div class="row align-items-center">
-                    ${user.imageUrl ? `
+                    ${imageUrl ? `
                         <div class="col-auto">
-                            <img src="${user.imageUrl}" alt="${user.displayName}" 
+                            <img src="${imageUrl}" alt="${user.displayName}" 
                                  style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
                         </div>
                     ` : ''}
@@ -260,10 +314,7 @@ function renderUserData(data) {
                             </a>
                         </p>
                         <div class="d-flex gap-4 flex-wrap">
-                            ${user.follower ? `<div><small class="text-muted d-block">Followers</small><strong>${user.follower.toLocaleString()}</strong></div>` : ''}
-                            ${user.kaito_smart_follower ? `<div><small class="text-muted d-block">🤖 Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>` : ''}
-                            ${user.cookie_smart_follower ? `<div><small class="text-muted d-block">🍪 Smart Followers</small><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>` : ''}
-                            ${user.wal_score ? `<div><small class="text-muted d-block">🦆 X SCORE</small><strong>${user.wal_score.toLocaleString()}</strong></div>` : ''}
+                            ${stats.join('')}
                         </div>
                     </div>
                 </div>

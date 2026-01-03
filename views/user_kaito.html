@@ -14,7 +14,7 @@
             <div class="row align-items-center">
                 <div class="col-auto">
                     % if user_info.get('imageId'):
-                        <img src="https://pbs.twimg.com/profile_images/{{user_info['imageId']}}/large.jpg" alt="{{user_info.get('displayName', handle)}}" style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
+                        <img src="/kaito-img/{{user_info['imageId']}}" alt="{{user_info.get('displayName', handle)}}" style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
                     % end
                 </div>
                 <div class="col">
@@ -24,15 +24,31 @@
                     <p class="text-muted mb-2">
                         <a href="https://x.com/{{handle}}" class="user-link" target="_blank">@{{handle}}</a>
                     </p>
-                    <div class="d-flex gap-4">
+                    <div class="d-flex gap-4 flex-wrap">
+                        % if user_info.get('follower'):
                         <div>
                             <small class="text-muted d-block">{{t['followers']}}</small>
                             <strong>{{user_info.get('follower', 'N/A')}}</strong>
                         </div>
+                        % end
+                        % if user_info.get('smartFollower'):
                         <div>
                             <small class="text-muted d-block">{{t['smart_followers']}}</small>
                             <strong>{{user_info.get('smartFollower', 'N/A')}}</strong>
                         </div>
+                        % end
+                        % if user_info.get('yaps_all'):
+                        <div>
+                            <small class="text-muted d-block">🎯 YAPS (All)</small>
+                            <strong>{{'{:,}'.format(int(round(user_info['yaps_all'])))}}</strong>
+                        </div>
+                        % end
+                        % if user_info.get('yaps_l30d') and user_info.get('yaps_l30d') > 0:
+                        <div>
+                            <small class="text-muted d-block">🎯 YAPS (30D)</small>
+                            <strong>{{'{:,}'.format(int(round(user_info['yaps_l30d'])))}}</strong>
+                        </div>
+                        % end
                     </div>
                 </div>
             </div>

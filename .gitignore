@@ -3,3 +3,4 @@
 access_log.txt
 unified_rankings.db
 *.db
+/static/kaito
