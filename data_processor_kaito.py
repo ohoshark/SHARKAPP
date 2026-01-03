@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import glob
 import pandas as pd
 from datetime import datetime
 
@@ -17,14 +18,18 @@ class DataProcessorKaito:
         # DB 초기화
         self.create_tables()
         
-        # 처리된 파일 추적
-        self.processed_files = {}  # {project: {timeframe: set(filenames)}}
-        self.load_processed_files()
+        # 처리된 파일 추적 (최신 파일만 추적)
+        self.latest_file = {}  # {project: {timeframe: filename}}
+        self.load_latest_files()
     
     def create_tables(self):
         """데이터베이스 테이블 생성"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
+            
+            # WAL 모드 활성화 (쓰기 중에도 읽기 가능)
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA busy_timeout=30000')  # 30초 타임아웃
             
             # 순위 데이터 테이블
             cursor.execute('''
@@ -40,6 +45,16 @@ class DataProcessorKaito:
                     smartFollower TEXT,
                     follower TEXT,
                     PRIMARY KEY (projectName, timeframe, timestamp, handle)
+                )
+            ''')
+            
+            # 최신 파일 정보 테이블 추가
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS latest_files (
+                    projectName TEXT,
+                    timeframe TEXT,
+                    filename TEXT,
+                    PRIMARY KEY (projectName, timeframe)
                 )
             ''')
             
@@ -60,20 +75,34 @@ class DataProcessorKaito:
             ''')
             
             conn.commit()
+            print("[Kaito DB] WAL 모드 활성화 완료 - 동시 읽기/쓰기 지원")
     
-    def load_processed_files(self):
-        """이미 처리된 파일 목록 로드"""
+    def load_latest_files(self):
+        """최신 파일 정보 로드"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT DISTINCT projectName, timeframe, timestamp FROM rankings')
+            cursor.execute('SELECT projectName, timeframe, filename FROM latest_files')
             rows = cursor.fetchall()
             
-            for project, timeframe, timestamp in rows:
-                if project not in self.processed_files:
-                    self.processed_files[project] = {}
-                if timeframe not in self.processed_files[project]:
-                    self.processed_files[project][timeframe] = set()
-                self.processed_files[project][timeframe].add(timestamp)
+            for project, timeframe, filename in rows:
+                if project not in self.latest_file:
+                    self.latest_file[project] = {}
+                self.latest_file[project][timeframe] = filename
+    
+    def save_latest_file(self, project_name, timeframe, filename):
+        """최신 파일 정보 저장"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO latest_files (projectName, timeframe, filename)
+                VALUES (?, ?, ?)
+            ''', (project_name, timeframe, filename))
+            conn.commit()
+        
+        # 메모리 업데이트
+        if project_name not in self.latest_file:
+            self.latest_file[project_name] = {}
+        self.latest_file[project_name][timeframe] = filename
     
     def scan_projects(self):
         """모든 Kaito 프로젝트 스캔"""
@@ -106,20 +135,31 @@ class DataProcessorKaito:
         if not os.path.exists(timeframe_dir):
             return new_files
         
-        # 처리된 파일 목록 가져오기
-        processed = self.processed_files.get(project_name, {}).get(timeframe, set())
+        # 최신 파일명 가져오기
+        latest_filename = self.latest_file.get(project_name, {}).get(timeframe, "")
+        
+        # 타임스탬프 정규화 함수 (cleanup과 동일)
+        def normalize_timestamp(filename):
+            """파일명에서 타임스탬프 부분만 추출하여 숫자로 변환"""
+            try:
+                name = filename.replace('.json', '')
+                name = name.replace('_', '').replace('-', '')
+                return name
+            except:
+                return filename
+        
+        latest_normalized = normalize_timestamp(latest_filename)
         
         # JSON 파일 스캔
-        for filename in os.listdir(timeframe_dir):
-            if filename.endswith('.json'):
-                filepath = os.path.join(timeframe_dir, filename)
-                
-                # 타임스탬프 추출 (파일명에서)
-                timestamp = filename.replace('.json', '').replace('_', '-').replace(' ', ' ')
-                
-                # 이미 처리된 파일인지 확인
-                if timestamp not in processed:
-                    new_files.append(filepath)
+        all_files = sorted(glob.glob(os.path.join(timeframe_dir, "*.json")))
+        
+        for filepath in all_files:
+            filename = os.path.basename(filepath)
+            filename_normalized = normalize_timestamp(filename)
+            
+            # 정규화된 타임스탬프로 비교 (최신 파일보다 새로운 파일만)
+            if filename_normalized > latest_normalized:
+                new_files.append(filepath)
         
         return new_files
     
@@ -132,12 +172,69 @@ class DataProcessorKaito:
             print(f"[Kaito] 파일 로드 실패: {filepath} - {e}")
             return None
     
+    def insert_data_batch(self, batch_items):
+        """배치 데이터 삽입 (여러 프로젝트/timeframe의 데이터를 한 번에 처리)
+        
+        Args:
+            batch_items: [(project_name, timeframe, timestamp, data), ...]
+        """
+        if not batch_items:
+            return
+        
+        # 모든 레코드를 한 번에 준비
+        all_records = []
+        files_to_save = {}  # {(project, timeframe): [filenames]}
+        
+        for project_name, timeframe, timestamp, data in batch_items:
+            if not data:
+                continue
+            
+            filename = f"{timestamp}.json"
+            
+            # 같은 project/timeframe의 모든 파일을 리스트로 저장
+            key = (project_name, timeframe)
+            if key not in files_to_save:
+                files_to_save[key] = []
+            files_to_save[key].append(filename)
+            
+            for item in data:
+                all_records.append((
+                    project_name,
+                    timeframe,
+                    timestamp,
+                    int(item.get('rank', 0)),
+                    item.get('handle', ''),
+                    item.get('displayName', ''),
+                    item.get('imageId', ''),
+                    item.get('mindshare', ''),
+                    item.get('smartFollower', ''),
+                    item.get('follower', '')
+                ))
+        
+        # 한 번의 트랜잭션으로 모든 데이터 삽입
+        if all_records:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+                cursor = conn.cursor()
+                cursor.executemany('''
+                    INSERT OR REPLACE INTO rankings 
+                    (projectName, timeframe, timestamp, rank, handle, displayName, imageId, mindshare, smartFollower, follower)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', all_records)
+                conn.commit()
+        
+        # 최신 파일 정보 저장 및 정리 (각 project/timeframe의 가장 최신 파일만)
+        for (project_name, timeframe), filenames in files_to_save.items():
+            # 가장 최신 파일을 찾음 (파일명이 타임스탬프라서 문자열 비교로 가능)
+            latest_filename = max(filenames)
+            self.save_latest_file(project_name, timeframe, latest_filename)
+            self.cleanup_old_files(project_name, timeframe)
+    
     def insert_data(self, project_name, timeframe, timestamp, data):
-        """데이터 삽입"""
+        """데이터 삽입 및 파일 정리 (단일 항목용 - 호환성 유지)"""
         if not data:
             return
         
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             for item in data:
@@ -160,12 +257,63 @@ class DataProcessorKaito:
             
             conn.commit()
         
-        # 처리된 파일 추적
-        if project_name not in self.processed_files:
-            self.processed_files[project_name] = {}
-        if timeframe not in self.processed_files[project_name]:
-            self.processed_files[project_name][timeframe] = set()
-        self.processed_files[project_name][timeframe].add(timestamp)
+        # 파일명 생성 (타임스탬프 기반)
+        filename = f"{timestamp}.json"
+        
+        # 최신 파일 정보 저장
+        self.save_latest_file(project_name, timeframe, filename)
+        
+        # 구버전 파일 정리
+        self.cleanup_old_files(project_name, timeframe)
+    
+    def cleanup_old_files(self, project_name, timeframe):
+        """최신 파일보다 오래된 파일들 삭제"""
+        timeframe_dir = os.path.join(self.base_dir, project_name, 'global', timeframe)
+        
+        if not os.path.exists(timeframe_dir):
+            return
+        
+        # 최신 파일명 가져오기
+        latest_filename = self.latest_file.get(project_name, {}).get(timeframe, "")
+        
+        if not latest_filename:
+            return
+        
+        # 모든 JSON 파일 스캔
+        all_files = glob.glob(os.path.join(timeframe_dir, "*.json"))
+        
+        if len(all_files) <= 1:
+            return
+        
+        # 타임스탬프 정규화 함수 (2026_0103_100000 또는 2026-0103-100000 -> 20260103100000)
+        def normalize_timestamp(filename):
+            """파일명에서 타임스탬프 부분만 추출하여 숫자로 변환"""
+            try:
+                # .json 제거
+                name = filename.replace('.json', '')
+                # 언더스코어와 대시 모두 제거
+                name = name.replace('_', '').replace('-', '')
+                return name
+            except:
+                return filename
+        
+        latest_normalized = normalize_timestamp(latest_filename)
+        
+        deleted_count = 0
+        for filepath in all_files:
+            filename = os.path.basename(filepath)
+            filename_normalized = normalize_timestamp(filename)
+            
+            # 정규화된 타임스탬프로 비교
+            if filename_normalized < latest_normalized:
+                try:
+                    os.remove(filepath)
+                    deleted_count += 1
+                except Exception as e:
+                    print(f"[Kaito] 파일 삭제 실패: {filepath} - {e}")
+        
+        if deleted_count > 0:
+            print(f"[Kaito] {project_name}/{timeframe}: {deleted_count}개 구버전 파일 삭제")
     
     def get_available_timestamps(self, project_name, timeframe):
         """사용 가능한 타임스탬프 목록"""

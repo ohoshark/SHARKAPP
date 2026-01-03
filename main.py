@@ -1,5 +1,5 @@
 from bottle import Bottle, route, run, template, static_file, request, redirect, response, abort, TEMPLATE_PATH
-from concurrent.futures import ThreadPoolExecutor  # 상단에 추가
+from concurrent.futures import ThreadPoolExecutor, as_completed  # 상단에 추가
 import os
 import json
 import sqlite3
@@ -10,6 +10,8 @@ from plotly.subplots import make_subplots
 import plotly.io as pio
 import threading
 import time
+import signal
+import sys
 from datetime import datetime
 from data_processor import DataProcessor
 from data_processor_wallchain import DataProcessorWallchain
@@ -47,6 +49,12 @@ CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 LOG_BUFFER = []
 LOG_BUFFER_SIZE = 100  # 100개 쌓이면 파일에 쓰기
 LOG_LOCK = threading.Lock()
+
+# Kaito DB 쓰기 Lock (병렬 처리 시 동시 쓰기 방지)
+KAITO_DB_LOCK = threading.Lock()
+
+# 종료 플래그 (Ctrl+C 처리용)
+SHUTDOWN_FLAG = threading.Event()
 
 def flush_logs():
     """버퍼에 쌓인 로그를 파일에 쓰기"""
@@ -407,79 +415,152 @@ def init_kaito_on_startup():
     print("✅ [Kaito] 통합 DB 생성 완료")
 
 def start_kaito_data_loader():
-    """Kaito 데이터 로더 스레드 (단일 스레드로 순차 처리)"""
-    def kaito_periodic_loader():
-        print("[Kaito] 데이터 로더 스레드 시작")
-        
-        # 최초 한 번 전체 로드
+    """Kaito 데이터 로더 스레드 (병렬 처리로 최적화)"""
+    
+    def load_project_timeframe(project, timeframe):
+        """단일 프로젝트/timeframe 조합 처리 (병렬 실행용)"""
         try:
-            print("[Kaito] 초기 데이터 로드 시작...")
-            projects = kaito_processor.scan_projects()
+            new_files = kaito_processor.check_new_files(project, timeframe)
             
-            for project in projects:
-                timeframes = ['7D', '30D', '90D', '180D', '360D']
+            if new_files:
+                # 배치 데이터 수집 (병렬 처리 - Lock 없음)
+                batch_data = []
+                for filepath in new_files:
+                    data = kaito_processor.load_json_file(filepath)
+                    if data:
+                        filename = os.path.basename(filepath)
+                        timestamp_str = filename.replace('.json', '').replace('_', '-')
+                        batch_data.append((project, timeframe, timestamp_str, data))
                 
-                for timeframe in timeframes:
-                    new_files = kaito_processor.check_new_files(project, timeframe)
+                # 반환 (나중에 한 번에 처리)
+                return batch_data
+            return None
+        except Exception as e:
+            print(f"[Kaito] {project}/{timeframe}: 오류 - {e}")
+            return None
+    
+    def kaito_periodic_loader():
+        print("[Kaito] 병렬 데이터 로더 시작")
+        
+        # 최초 한 번 전체 로드 (병렬 처리)
+        try:
+            print("[Kaito] 초기 데이터 로드 시작 (병렬 처리)...")
+            projects = kaito_processor.scan_projects()
+            timeframes = ['7D', '30D', '90D', '180D', '360D']
+            
+            # 프로젝트 × timeframe 조합 생성
+            tasks = [(p, tf) for p in projects for tf in timeframes]
+            
+            # ThreadPoolExecutor로 병렬 처리 (최대 5개 워커)
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                # future와 task 정보를 매핑
+                future_to_task = {executor.submit(load_project_timeframe, p, tf): (p, tf) for p, tf in tasks}
+                
+                # 결과 수집 (배치로 모음)
+                all_batch_data = []
+                
+                # 완료되는 순서대로 실시간 처리 (timeout으로 빠른 종료 지원)
+                for future in as_completed(future_to_task, timeout=None):
+                    if SHUTDOWN_FLAG.is_set():
+                        print("[Kaito] 종료 신호 감지, 로드 중단...")
+                        # 모든 미완료 작업 취소
+                        for f in future_to_task:
+                            f.cancel()
+                        return
                     
-                    if new_files:
-                        print(f"[Kaito] {project}/{timeframe}: {len(new_files)}개 파일 로드 중...")
-                        
-                        for filepath in new_files:
-                            data = kaito_processor.load_json_file(filepath)
-                            
-                            if data:
-                                # 타임스탬프 추출
-                                filename = os.path.basename(filepath)
-                                timestamp_str = filename.replace('.json', '').replace('_', '-')
-                                
-                                # 데이터 삽입
-                                kaito_processor.insert_data(project, timeframe, timestamp_str, data)
-                        
-                        print(f"[Kaito] {project}/{timeframe}: 완료 ✓")
+                    p, tf = future_to_task[future]
+                    try:
+                        # timeout 1초로 빠르게 체크
+                        result = future.result(timeout=1.0)
+                        if result:
+                            all_batch_data.extend(result)
+                            print(f"[Kaito] {p}/{tf}: {len(result)}개 파일 수집 완료")
+                    except Exception as e:
+                        if SHUTDOWN_FLAG.is_set():
+                            return
+                        # timeout 외 예외는 무시하고 계속
+                        pass
+                
+                # 한 번에 배치 삽입 (Lock으로 보호)
+                if all_batch_data:
+                    print(f"[Kaito] DB 삽입 시작... (총 {len(all_batch_data)}개 항목)")
+                    with KAITO_DB_LOCK:
+                        kaito_processor.insert_data_batch(all_batch_data)
+                    print(f"[Kaito] DB 삽입 완료")
             
             print("[Kaito] ✅ 초기 데이터 로드 완료")
         except Exception as e:
             print(f"[Kaito] ❌ 초기 로드 오류: {e}")
         
-        # 주기적으로 신규 파일 체크 (30초마다)
-        while True:
+        # 주기적으로 신규 파일 체크 (30초마다, 병렬 처리)
+        while not SHUTDOWN_FLAG.is_set():
             try:
-                time.sleep(30)
+                time.sleep(1)  # 1초씩 체크하여 빠른 종료
+                if SHUTDOWN_FLAG.is_set():
+                    break
+                
+                # 30초 대기 (1초씩 체크)
+                for _ in range(30):
+                    if SHUTDOWN_FLAG.is_set():
+                        break
+                    time.sleep(1)
+                
+                if SHUTDOWN_FLAG.is_set():
+                    break
                 
                 projects = kaito_processor.scan_projects()
-                new_data_found = False
+                timeframes = ['7D', '30D', '90D', '180D', '360D']
+                tasks = [(p, tf) for p in projects for tf in timeframes]
                 
-                for project in projects:
-                    timeframes = ['7D', '30D', '90D', '180D', '360D']
+                new_data_found = False
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    # future와 task 정보를 매핑
+                    future_to_task = {executor.submit(load_project_timeframe, p, tf): (p, tf) for p, tf in tasks}
                     
-                    for timeframe in timeframes:
-                        new_files = kaito_processor.check_new_files(project, timeframe)
+                    # 결과 수집 (배치로 모음)
+                    all_batch_data = []
+                    
+                    # 완료되는 순서대로 실시간 처리 (timeout으로 빠른 종료 지원)
+                    for future in as_completed(future_to_task, timeout=None):
+                        if SHUTDOWN_FLAG.is_set():
+                            # 모든 미완료 작업 취소
+                            for f in future_to_task:
+                                f.cancel()
+                            break
                         
-                        if new_files:
-                            if not new_data_found:
-                                print(f"\n[Kaito] 신규 데이터 발견...")
-                                new_data_found = True
-                            
-                            print(f"[Kaito] {project}/{timeframe}: {len(new_files)}개 파일")
-                            
-                            for filepath in new_files:
-                                data = kaito_processor.load_json_file(filepath)
+                        p, tf = future_to_task[future]
+                        try:
+                            # timeout 1초로 빠르게 체크
+                            result = future.result(timeout=1.0)
+                            if result:
+                                if not new_data_found:
+                                    print(f"\n[Kaito] 신규 데이터 발견 (병렬 처리)...")
+                                    new_data_found = True
                                 
-                                if data:
-                                    filename = os.path.basename(filepath)
-                                    timestamp_str = filename.replace('.json', '').replace('_', '-')
-                                    kaito_processor.insert_data(project, timeframe, timestamp_str, data)
-                            
-                            print(f"[Kaito] {project}/{timeframe}: 완료 ✓")
+                                all_batch_data.extend(result)
+                                print(f"[Kaito] {p}/{tf}: {len(result)}개 파일 수집 완료")
+                        except Exception as e:
+                            if SHUTDOWN_FLAG.is_set():
+                                break
+                            # timeout 외 예외는 무시하고 계속
+                            pass
+                    
+                    # 한 번에 배치 삽입 (Lock으로 보호)
+                    if all_batch_data:
+                        print(f"[Kaito] DB 삽입 시작... (총 {len(all_batch_data)}개 항목)")
+                        with KAITO_DB_LOCK:
+                            kaito_processor.insert_data_batch(all_batch_data)
+                        print(f"[Kaito] DB 삽입 완료")
                 
                 if new_data_found:
                     print("[Kaito] ✅ 신규 데이터 로드 완료\n")
-                    # 캐시 무효화
                     KAITO_CACHE["list"] = []
                     
             except Exception as e:
-                print(f"[Kaito] 데이터 로드 오류: {e}")
+                if not SHUTDOWN_FLAG.is_set():
+                    print(f"[Kaito] 데이터 로드 오류: {e}")
+        
+        print("[Kaito] 데이터 로더 스레드 종료")
     
     thread = threading.Thread(target=kaito_periodic_loader, daemon=True)
     thread.start()
@@ -672,90 +753,85 @@ def update_global_rankings():
             try:
                 print(f"[Kaito] 데이터 수집 중...")
                 
-                # Kaito DB에서 최신 데이터 가져오기
-                with sqlite3.connect('./data/kaito/kaito_projects.db') as conn:
+                # Kaito DB에서 최신 데이터 가져오기 (최적화된 단일 쿼리)
+                with sqlite3.connect('./data/kaito/kaito_projects.db', timeout=30.0) as conn:
                     cursor = conn.cursor()
                     
-                    # 각 프로젝트별 최신 타임스탬프 찾기
+                    # 한 번의 쿼리로 모든 최신 데이터 가져오기 (JOIN 사용)
                     cursor.execute('''
-                        SELECT projectName, timeframe, MAX(timestamp) as latest_ts
-                        FROM rankings
-                        GROUP BY projectName, timeframe
+                        SELECT r.handle, r.displayName, r.imageId, r.rank, r.mindshare, 
+                               r.smartFollower, r.follower, r.projectName, r.timeframe
+                        FROM rankings r
+                        INNER JOIN (
+                            SELECT projectName, timeframe, MAX(timestamp) as latest_ts
+                            FROM rankings
+                            GROUP BY projectName, timeframe
+                        ) latest
+                        ON r.projectName = latest.projectName 
+                           AND r.timeframe = latest.timeframe 
+                           AND r.timestamp = latest.latest_ts
                     ''')
                     
-                    latest_timestamps = cursor.fetchall()
+                    all_rows = cursor.fetchall()
                     
-                    # 고유 프로젝트 목록 추출 (중복 제거)
-                    unique_projects = set()
-                    for project_name, timeframe, latest_ts in latest_timestamps:
-                        unique_projects.add(project_name)
+                    # 고유 프로젝트 수 계산
+                    unique_projects = set(row[7] for row in all_rows)
+                    print(f"[Kaito] 발견된 프로젝트 수: {len(unique_projects)}, 총 레코드: {len(all_rows)}")
                     
-                    print(f"[Kaito] 발견된 프로젝트 수: {len(unique_projects)}")
-                    
-                    for project_name, timeframe, latest_ts in latest_timestamps:
-                        # 해당 프로젝트/timeframe의 최신 데이터 가져오기
-                        cursor.execute('''
-                            SELECT handle, displayName, imageId, rank, mindshare, smartFollower, follower
-                            FROM rankings
-                            WHERE projectName = ? AND timeframe = ? AND timestamp = ?
-                        ''', (project_name, timeframe, latest_ts))
+                    # 메모리에서 빠르게 처리
+                    for row in all_rows:
+                        handle = row[0]
+                        display_name = row[1]
+                        image_id = row[2]
+                        rank = row[3]
+                        mindshare_str = row[4]
+                        smart_follower_str = row[5]
+                        follower_str = row[6]
+                        project_name = row[7]
+                        timeframe = row[8]
                         
-                        rows = cursor.fetchall()
+                        # mindshare를 숫자로 변환
+                        try:
+                            mindshare_value = float(mindshare_str.rstrip('%'))
+                        except:
+                            mindshare_value = 0.0
                         
-                        for row in rows:
-                            handle = row[0]  # handle (@ 없이 저장됨)
-                            display_name = row[1]
-                            image_id = row[2]
-                            rank = row[3]
-                            mindshare_str = row[4]  # "22.66%" 형식
-                            smart_follower_str = row[5] if len(row) > 5 else None
-                            follower_str = row[6] if len(row) > 6 else None
-                            
-                            # mindshare를 숫자로 변환
-                            try:
-                                mindshare_value = float(mindshare_str.rstrip('%'))
-                            except:
-                                mindshare_value = 0.0
-                            
-                            # 팔로워 수를 정수로 변환
-                            try:
-                                smart_follower = int(smart_follower_str.replace(',', '')) if smart_follower_str else None
-                            except:
-                                smart_follower = None
-                            
-                            try:
-                                follower = int(follower_str.replace(',', '')) if follower_str else None
-                            except:
-                                follower = None
-                            
-                            # 이미지 URL 생성
-                            if image_id:
-                                image_url = image_id  # 숫자 ID만 저장 (wallchain/cookie 우선순위 로직에서 처리)
-                            else:
-                                image_url = ""
-                            
-                            # 유저 정보 수집
-                            if handle in users_batch:
-                                # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
-                                existing = users_batch[handle]
-                                # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
-                                final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
-                                # kaito_smart_follower와 follower는 None이 아닌 경우에만 업데이트
-                                final_kaito_smart = smart_follower if smart_follower is not None else existing[5]
-                                final_follower = follower if follower is not None else existing[6]
-                                users_batch[handle] = (handle, existing[1], final_image, existing[3],
-                                                      existing[4], final_kaito_smart, final_follower)
-                            else:
-                                # 없으면 새로 추가
-                                users_batch[handle] = (handle, display_name, image_url, None,
-                                                      None, smart_follower, follower)
-                            
-                            # 순위 정보 수집 (kaito- prefix 추가)
-                            full_project_name = f"kaito-{project_name}"
-                            rankings_batch.append((
-                                handle, full_project_name, timeframe,
-                                rank, None, mindshare_value, None, None
-                            ))
+                        # 팔로워 수를 정수로 변환
+                        try:
+                            smart_follower = int(smart_follower_str.replace(',', '')) if smart_follower_str else None
+                        except:
+                            smart_follower = None
+                        
+                        try:
+                            follower = int(follower_str.replace(',', '')) if follower_str else None
+                        except:
+                            follower = None
+                        
+                        # 이미지 URL 생성
+                        image_url = image_id if image_id else ""
+                        
+                        # 유저 정보 수집
+                        if handle in users_batch:
+                            # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
+                            existing = users_batch[handle]
+                            # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
+                            final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
+                            # kaito_smart_follower와 follower는 None이 아닌 경우에만 업데이트
+                            final_kaito_smart = smart_follower if smart_follower is not None else existing[5]
+                            final_follower = follower if follower is not None else existing[6]
+                            users_batch[handle] = (handle, existing[1], final_image, existing[3],
+                                                  existing[4], final_kaito_smart, final_follower)
+                        else:
+                            # 없으면 새로 추가
+                            users_batch[handle] = (handle, display_name, image_url, None,
+                                                  None, smart_follower, follower)
+                        
+                        # 순위 정보 수집 (kaito- prefix 추가)
+                        full_project_name = f"kaito-{project_name}"
+                        rankings_batch.append((
+                            handle, full_project_name, timeframe,
+                            rank, None, mindshare_value, None, None
+                        ))
                 
                 print(f"[Kaito] 데이터 수집 완료 ✓")
                 
@@ -782,7 +858,7 @@ def update_global_rankings():
                 collected_keys.add((infoName, projectName, timeframe))
             
             # DB에서 갱신되지 않은 row 찾아서 ms, cms를 0으로
-            with sqlite3.connect('./data/global_rankings.db') as conn:
+            with sqlite3.connect('./data/global_rankings.db', timeout=30.0) as conn:
                 cursor = conn.cursor()
                 
                 # 모든 rankings의 key 가져오기
@@ -843,7 +919,7 @@ def schedule_global_updates():
             print(f"[글로벌 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}, Kaito: {kaito_count}")
             
             # 데이터베이스에 데이터가 있는지 확인
-            conn = sqlite3.connect('./data/global_rankings.db')
+            conn = sqlite3.connect('./data/global_rankings.db', timeout=30.0)
             cursor = conn.cursor()
             cursor.execute('SELECT COUNT(*) FROM users')
             count = cursor.fetchone()[0]
@@ -2576,6 +2652,21 @@ def handle_404(error):
 from waitress import serve
                 
 if __name__ == '__main__':
+    # Ctrl+C 시그널 핸들러 등록
+    def signal_handler(sig, frame):
+        print("\n\n[시스템] 종료 신호 감지 (Ctrl+C)")
+        print("[시스템] 모든 스레드 종료 중...")
+        SHUTDOWN_FLAG.set()
+        
+        # 로그 플러시
+        flush_logs()
+        
+        print("[시스템] 종료 완료")
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     print("\n" + "="*60)
     print("🦈 SHARKAPP 서버 시작 중...")
     print("="*60)
@@ -2617,6 +2708,8 @@ if __name__ == '__main__':
         optimal_threads = max(4, min(16, multiprocessing.cpu_count() * 2))
         
         print(f"⚡ Waitress threads: {optimal_threads}")
+        print("⚠️  Ctrl+C를 눌러 종료하세요\n")
+        
         serve(app, 
               host='0.0.0.0', 
               port=8080, 
@@ -2625,6 +2718,8 @@ if __name__ == '__main__':
               cleanup_interval=10,  # 연결 정리 주기
               asyncore_use_poll=True)  # epoll 사용 (Linux에서 성능 향상)
     except KeyboardInterrupt:
-        print("\n[시스템] 종료 중... 모든 프로세스를 강제 종료합니다.")
-        import os
-        os._exit(0) # 👈 데몬 스레드 무시하고 즉시 종료
+        print("\n[시스템] KeyboardInterrupt 감지")
+        SHUTDOWN_FLAG.set()
+        flush_logs()
+        print("[시스템] 종료 완료")
+        sys.exit(0)

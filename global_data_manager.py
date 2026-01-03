@@ -10,8 +10,12 @@ class GlobalDataManager:
     
     def init_database(self):
         """글로벌 DB 초기화 및 테이블 생성"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
+            
+            # WAL 모드 활성화 (동시 읽기/쓰기 지원)
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
             
             # 유저 정보 테이블
             cursor.execute('''
@@ -66,7 +70,7 @@ class GlobalDataManager:
     def update_user(self, info_name, display_name=None, image_url=None, wal_score=None, 
                    cookie_smart_follower=None, kaito_smart_follower=None, follower=None):
         """유저 정보 업데이트 (wallchain > cookie > kaito 우선순위)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # 기존 데이터 확인
@@ -119,7 +123,7 @@ class GlobalDataManager:
                       cms_rank=None, ms=None, cms=None, 
                       position_change=None):
         """순위 정보 업데이트"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -133,7 +137,7 @@ class GlobalDataManager:
     
     def search_users(self, query, limit=10):
         """유저 검색 (infoName, displayName 모두 검색) - SQLite 쿼리 기반 (한글 완벽 지원)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # @ prefix 제거
@@ -171,7 +175,7 @@ class GlobalDataManager:
     
     def get_user_data(self, info_name):
         """특정 유저의 전체 데이터 가져오기"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # 유저 기본 정보
@@ -247,14 +251,14 @@ class GlobalDataManager:
     
     def clear_all_rankings(self):
         """모든 순위 데이터 삭제 (갱신 전)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM rankings')
             conn.commit()
     
     def begin_batch_update(self):
         """배치 업데이트 시작 - 임시 테이블 생성"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # 임시 테이블 생성 (기존 테이블과 동일 구조)
@@ -292,7 +296,7 @@ class GlobalDataManager:
     
     def batch_insert_users(self, users_data):
         """유저 데이터 배치 삽입"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             cursor.executemany('''
                 INSERT OR REPLACE INTO users_temp (infoName, displayName, imageUrl, wal_score,
@@ -303,7 +307,7 @@ class GlobalDataManager:
     
     def batch_insert_rankings(self, rankings_data):
         """순위 데이터 배치 삽입"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             cursor.executemany('''
                 INSERT OR REPLACE INTO rankings_temp 
@@ -314,7 +318,7 @@ class GlobalDataManager:
     
     def commit_batch_update(self):
         """배치 업데이트 완료 - 임시 테이블을 실제 테이블로 교체 (원자적)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # 트랜잭션으로 한번에 교체

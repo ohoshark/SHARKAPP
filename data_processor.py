@@ -25,6 +25,11 @@ class DataProcessor:
         """DB 연결 및 필요한 테이블/인덱스 생성"""
         with sqlite3.connect(self.db_path, check_same_thread=False) as conn:
             cursor = conn.cursor()
+            
+            # WAL 모드 활성화 (쓰기 중에도 읽기 가능)
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA busy_timeout=30000')  # 30초 타임아웃
+            
             # 메인 데이터 테이블 수정
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS snaps (
