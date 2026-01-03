@@ -2525,7 +2525,7 @@ def kaito_leaderboard_route(projectname):
     return template('leaderboard_kaito',
                    projectname=projectname,
                    project=projectname,
-                   display_project_name=f"🤖 {projectname}",
+                   display_project_name=f"{projectname}",
                    timeframe=timeframe,
                    timeframes=available_timeframes,
                    timestamp1=timestamp1,
