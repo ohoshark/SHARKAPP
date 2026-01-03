@@ -2285,7 +2285,7 @@ def kaito_leaderboard_route(projectname):
     
     # 기본값 설정
     if not timestamp1 or timestamp1 not in available_timestamps:
-        timestamp1 = available_timestamps[-3] if len(available_timestamps) > 1 else available_timestamps[0]
+        timestamp1 = available_timestamps[-3] if len(available_timestamps) > 2 else available_timestamps[0]
     if not timestamp2 or timestamp2 not in available_timestamps:
         timestamp2 = available_timestamps[-1]
     
