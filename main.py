@@ -48,7 +48,9 @@ CACHE_INTERVAL = 300  # 5분마다 갱신 (필요에 따라 조절)
 
 # 로그 버퍼 (메모리에 쌓아두고 주기적으로 쓰기)
 LOG_BUFFER = []
-LOG_BUFFER_SIZE = 100  # 100개 쌓이면 파일에 쓰기
+LOG_BUFFER_SIZE = 5  # 5개 쌓이면 파일에 쓰기
+LOG_BUFFER_TIMEOUT = 5  # 5초마다 강제 저장
+LOG_LAST_FLUSH = time.time()
 LOG_LOCK = threading.Lock()
 
 # YAPS 캐시 (동일 사용자 5분간 캐시)
@@ -63,12 +65,14 @@ SHUTDOWN_FLAG = threading.Event()
 
 def flush_logs():
     """버퍼에 쌓인 로그를 파일에 쓰기"""
+    global LOG_LAST_FLUSH
     with LOG_LOCK:
         if LOG_BUFFER:
             try:
                 with open(LOG_FILE, 'a', encoding='utf-8') as f:
                     f.writelines(LOG_BUFFER)
                 LOG_BUFFER.clear()
+                LOG_LAST_FLUSH = time.time()
             except Exception as e:
                 print(f"[ERROR] 로그 파일 쓰기 실패: {e}")
 
@@ -101,14 +105,18 @@ def log_access(route_name, project_name, username=None):
     user_agent = request.environ.get('HTTP_USER_AGENT', 'Unknown')
     session_id = f"{ip_address}_{user_agent}" 
 
-    # 로그 메시지 포맷: 시간 | IP | 라우트 이름 | 프로젝트 | 사용자명 | 세션 ID
-    log_message = f"{timestamp}|{ip_address}|{route_name}|{project_name}|{username or '-'}|{session_id}\n"
+    # Referer (유입 경로) 확인
+    referer = request.environ.get('HTTP_REFERER', '-') or '-'
+
+    # 로그 메시지 포맷: 시간 | IP | 라우트 이름 | 프로젝트 | 사용자명 | 세션 ID | REFERER
+    log_message = f"{timestamp}|{ip_address}|{route_name}|{project_name}|{username or '-'}|{session_id}|{referer}\n"
     
     # 버퍼에 추가
     with LOG_LOCK:
         LOG_BUFFER.append(log_message)
-        # 버퍼가 꽉 차면 즉시 쓰기
-        if len(LOG_BUFFER) >= LOG_BUFFER_SIZE:
+        current_time = time.time()
+        # 버퍼가 꽉 차거나 타임아웃이 지나면 쓰기
+        if len(LOG_BUFFER) >= LOG_BUFFER_SIZE or (current_time - LOG_LAST_FLUSH) >= LOG_BUFFER_TIMEOUT:
             threading.Thread(target=flush_logs, daemon=True).start()
         
 def get_cached_projects():
