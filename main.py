@@ -1251,7 +1251,7 @@ def project_index(projectname):
 @app.route('/<projectname>/leaderboard')
 @app.route('/cookie/<projectname>/leaderboard')
 def project_leaderboard(projectname):
-    log_access('project_leaderboard', projectname)
+    log_access('cookie_leaderboard', projectname)
     lang = get_language()  # 현재 설정된 언어 가져오기
     if projectname not in project_instances:
         # favicon.ico나 wp-admin 같은 경로 처리
