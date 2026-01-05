@@ -1207,7 +1207,7 @@ def home_redirect(projectname):
 @app.route('/cookie/<projectname>')
 @app.route('/cookie/<projectname>/')
 def project_index(projectname):
-    log_access('user_search', projectname)
+    log_access('cookie_user', projectname)
     # 🚨 [필수 추가] /favicon.ico 요청이 실수로 앱에 도달했을 때 404 반환
     lang = get_language()  # 현재 설정된 언어 가져오기
     if projectname.lower() == 'favicon.ico':
@@ -1780,7 +1780,7 @@ def project_compare_users(projectname):
 @app.route('/wallchain/<projectname>')
 @app.route('/wallchain/<projectname>/')
 def wallchain_index(projectname):
-    log_access('user_search_wall', projectname)
+    log_access('wall_user', projectname)
     lang = get_language()
     
     full_project_name = f"wallchain-{projectname}"
