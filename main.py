@@ -2555,7 +2555,7 @@ def kaito_leaderboard_route(projectname):
 @app.route('/kaito/<projectname>/user/<handle>')
 def kaito_user_route(projectname, handle):
     """Kaito 사용자 분석 페이지"""
-    log_access('kaito_user', f"{projectname}/{handle}")
+    log_access('kaito_user', projectname, handle)
     
     if not kaito_processor:
         return render_error("Kaito 시스템이 초기화되지 않았습니다", projectname)
