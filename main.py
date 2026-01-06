@@ -1165,7 +1165,7 @@ def api_user_data(username):
     response.content_type = 'application/json; charset=utf-8'
     
     # 검색 로그 기록
-    log_access('user_lookup',  username)
+    log_access('user_lookup', "GLOBAL", username)
     
     try:
         data = global_manager.get_user_data(username)
