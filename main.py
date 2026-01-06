@@ -1251,7 +1251,7 @@ def project_index(projectname):
 @app.route('/<projectname>/leaderboard')
 @app.route('/cookie/<projectname>/leaderboard')
 def project_leaderboard(projectname):
-    log_access('cookie_leaderboard', projectname)
+    log_access('cookie_lb', projectname)
     lang = get_language()  # 현재 설정된 언어 가져오기
     if projectname not in project_instances:
         # favicon.ico나 wp-admin 같은 경로 처리
@@ -1478,7 +1478,7 @@ def project_leaderboard(projectname):
 @app.route('/<projectname>/user/<username>')
 @app.route('/cookie/<projectname>/user/<username>')
 def project_user_analysis(projectname,username):
-    log_access('user', projectname, username)
+    log_access('cookie_user', projectname, username)
     lang = get_language()  # 현재 설정된 언어 가져오기
 
     if projectname not in project_instances:
@@ -1863,7 +1863,7 @@ def wallchain_index(projectname):
 
 @app.route('/wallchain/<projectname>/leaderboard')
 def wallchain_leaderboard(projectname):
-    log_access('wallchain_leaderboard', projectname)
+    log_access('wall_lb', projectname)
     lang = get_language()
     
     full_project_name = f"wallchain-{projectname}"
@@ -2092,7 +2092,7 @@ def wallchain_leaderboard(projectname):
 
 @app.route('/wallchain/<projectname>/user/<username>')
 def wallchain_user_analysis(projectname, username):
-    log_access('wallchain_user', projectname, username)
+    log_access('wall_user', projectname, username)
     lang = get_language()
     
     full_project_name = f"wallchain-{projectname}"
@@ -2359,7 +2359,7 @@ def kaito_index_route(projectname):
 @app.route('/kaito/<projectname>/leaderboard')
 def kaito_leaderboard_route(projectname):
     """Kaito 리더보드 비교 페이지"""
-    log_access('kaito_leaderboard', projectname)
+    log_access('kaito_lb', projectname)
     
     if not kaito_processor:
         return render_error("Kaito 시스템이 초기화되지 않았습니다", projectname)
