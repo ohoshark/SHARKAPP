@@ -208,13 +208,6 @@
     </div>
 
     <script>
-		// Check if Bootstrap is loaded
-		if (typeof bootstrap === 'undefined') {
-			console.error('Bootstrap is not loaded!');
-		} else {
-			console.log('Bootstrap version:', bootstrap.Tooltip.VERSION);
-		}
-		
 		// Compressed data - minified for performance
 		const rawTimestamps = {{ !timestamps }};
 		const formattedTimestamps = {{ !formatted_timestamps }};
@@ -329,35 +322,62 @@
 				// 인덱스를 슬라이더 값으로 변환
 				const start1 = indexToSlider(start1_idx, max_index);
 				const start2 = indexToSlider(start2_idx, max_index);
+			
+			// 언어 설정
+			const currentLang = "{{ lang }}";
 
-				noUiSlider.create(slider, {
-					start: [start1, start2], 
-					connect: true,
-					step: 0.1, 
-					range: {
-						'min': 0,
-						'max': 100
-					},
-					pips: { 
-						mode: 'values',
-					values: [0, 50, 75, 100], //display only key points
-					density: 4
+			noUiSlider.create(slider, {
+				start: [start1, start2], 
+				connect: true,
+				step: 0.1, 
+				range: {
+					'min': 0,
+					'max': 100
+				},
+				pips: { 
+					mode: 'values',
+					values: [0, 50, 75, 100],
+					density: 4,
+					format: {
+						to: function(value) {
+							if (value === 75) {
+								return currentLang === 'ko' ? '최근 9시간' : 'Recent 9H';
+							} else if (value === 100) {
+								return currentLang === 'ko' ? '현재' : 'Current';
+							} else {
+								// 0, 50의 경우 해당 슬라이더 값의 인덱스 타임스탬프 표시
+								const idx = Math.round(sliderToIndex(value, max_index));
+								
+								// 인덱스 범위 확인
+								if (idx >= 0 && idx < rawTimestamps.length) {
+									const ts = rawTimestamps[idx];
+									
+									// 타임스탬프를 날짜로 변환 (문자열 형식)
+									const date = new Date(ts);
+									const month = date.getMonth() + 1;
+									const day = date.getDate();
+									
+									return currentLang === 'ko' ? `${month}월${day}일` : `${month}M${day}D`;
+								}
+								
+								return value.toString();
+							}
+						}
+					}
 				}
 			});
 
 			slider.noUiSlider.on('update', function (values, handle) {
 				const sliderVal1 = parseFloat(values[0]);
-				const sliderVal2 = parseFloat(values[1]);
-				
-				const index1 = sliderToIndex(sliderVal1, max_index);
-				const index2 = sliderToIndex(sliderVal2, max_index);
-				
-				const newTs1 = rawTimestamps[index1];
-				const newTs2 = rawTimestamps[index2];
+			const sliderVal2 = parseFloat(values[1]);
+			const index1 = sliderToIndex(sliderVal1, max_index);
+			const index2 = sliderToIndex(sliderVal2, max_index);
+			
+			const newTs1 = rawTimestamps[index1];
+			const newTs2 = rawTimestamps[index2];
 			
 			input1.value = newTs1;
 			input2.value = newTs2;
-			
 			display1.textContent = formattedTimestamps[newTs1] || newTs1;
 			display2.textContent = formattedTimestamps[newTs2] || newTs2;
 			
@@ -416,13 +436,42 @@
 	let table = null;
 	
 	if ($tableElement.length > 0) {
+		// 데이터 개수 확인
+		const rowCount = $tableElement.find('tbody tr').length;
+		
+		// 기본 메뉴 옵션
+		const baseOptions = [100, 300, 500];
+		const lengthValues = [];
+		const lengthLabels = [];
+		
+		// 데이터 개수보다 작거나 같은 옵션만 추가
+		for (let option of baseOptions) {
+			if (option <= rowCount) {
+				lengthValues.push(option);
+				lengthLabels.push(option);
+			}
+		}
+		
+		// 데이터 개수가 기본 옵션에 없으면 추가
+		if (!lengthValues.includes(rowCount) && rowCount > 0) {
+			lengthValues.push(rowCount);
+			lengthLabels.push(rowCount);
+		}
+		
+		// All 옵션 추가
+		lengthValues.push(-1);
+		lengthLabels.push("All");
+		
+		// 기본 페이지 길이 설정 (데이터 개수 또는 300 중 작은 값)
+		const defaultPageLength = Math.min(rowCount > 0 ? rowCount : 300, 300);
+		
 		table = $tableElement.DataTable({
 			"dom": "<'row'<'col-6 col-md-6'l><'col-6 col-md-6'p>>" +
 				   "<'row'<'col-sm-12'tr>>" +
 				   "<'row'<'col-sm-12 text-center'i>>",
 			"paging": true,
-			"pageLength": 300,
-			"lengthMenu": [[100, 300, 500, -1], [100, 300, 500, "All"]],
+			"pageLength": defaultPageLength,
+			"lengthMenu": [lengthValues, lengthLabels],
 			"info": true,
 			"ordering": true,
 			"searching": false,
