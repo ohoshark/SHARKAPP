@@ -1,5 +1,6 @@
 let searchTimeout;
 let selectedIndex = -1; // 키보드로 선택된 항목 인덱스
+let lastSearchedUsername = ''; // 마지막으로 검색한 유저 이름 저장
 const searchInput = document.getElementById('userSearchInput');
 const autocompleteDropdown = document.getElementById('autocompleteDropdown');
 const searchButton = document.getElementById('searchButton');
@@ -128,11 +129,16 @@ function updateSelection(items) {
     });
 }
 
-// 외부 클릭 시 드롭다운 닫기
+// 외부 클릭 시 드롭다운 닫기 및 검색창 값 복원
 document.addEventListener('click', function(e) {
     if (!searchInput.contains(e.target) && !autocompleteDropdown.contains(e.target)) {
         autocompleteDropdown.style.display = 'none';
         selectedIndex = -1;
+        
+        // 검색창이 비어있고 마지막 검색어가 있으면 복원
+        if (!searchInput.value.trim() && lastSearchedUsername) {
+            searchInput.value = lastSearchedUsername;
+        }
     }
 });
 
@@ -147,6 +153,13 @@ searchInput.addEventListener('focus', function() {
 // 검색 버튼 클릭
 searchButton.addEventListener('click', function() {
     let username = searchInput.value.trim();
+    
+    // 입력값이 없고 마지막 검색어가 있으면 복원
+    if (!username && lastSearchedUsername) {
+        searchInput.value = lastSearchedUsername;
+        return;
+    }
+    
     // @ prefix 제거
     if (username.startsWith('@')) {
         username = username.substring(1).trim();
@@ -160,8 +173,9 @@ searchButton.addEventListener('click', function() {
 function loadUserData(username) {
     searchResults.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
     
-    // 검색창에 검색한 유저 이름 표시
+    // 검색창에 검색한 유저 이름 표시 및 저장
     searchInput.value = username;
+    lastSearchedUsername = username; // 마지막 검색어 저장
     
     // URL에 username 추가
     const url = new URL(window.location);
