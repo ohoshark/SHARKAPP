@@ -502,3 +502,19 @@ window.addEventListener('DOMContentLoaded', function() {
         loadUserData(username);
     }
 });
+
+// 브라우저 뒤로가기/앞으로가기 처리
+window.addEventListener('popstate', function(event) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    
+    if (username) {
+        searchInput.value = username;
+        loadUserData(username);
+    } else {
+        // username이 없으면 검색 결과 초기화
+        searchResults.innerHTML = '';
+        searchInput.value = '';
+        lastSearchedUsername = '';
+    }
+});
