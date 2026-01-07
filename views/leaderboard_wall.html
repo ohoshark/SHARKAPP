@@ -202,80 +202,166 @@
 			timestampMap[ts] = index;
 		});
 
-		document.addEventListener('DOMContentLoaded', function() {
-			const slider = document.getElementById('timeSlider');
-			const input1 = document.getElementById('timestamp1');
-			const input2 = document.getElementById('timestamp2');
-			const display1 = document.getElementById('slider-timestamp1');
-			const display2 = document.getElementById('slider-timestamp2');
+// 슬라이더 값(0-100)을 타임스탬프 인덱스로 변환하는 비선형 함수
+	function sliderToIndex(sliderValue, maxIndex) {
+		if (maxIndex < 9) {
+			// 데이터가 9개 미만이면 선형 분포 사용
+			const ratio = sliderValue / 100;
+			return Math.round(ratio * maxIndex);
+		}
+		
+		// 최근 9개 데이터 인덱스
+		const recentCount = Math.min(9, maxIndex + 1);
+		const recentStartIdx = maxIndex - recentCount + 1;
+		
+		// 슬라이더 구간 설정: 75-100%에 최근 9개, 52.5-75%에 중간 50%, 0-52.5%에 나머지
+		const recentZoneStart = 75;  // 75-100%: 최근 9개
+		const midZoneStart = 52.5;   // 52.5-75% (22.5%): 중간 50% 데이터
+		// 0-52.5% (52.5%): 나머지 일정하게 분포
+		
+		if (sliderValue >= recentZoneStart) {
+			// 75-100%: 최근 9개 데이터
+			const ratio = (sliderValue - recentZoneStart) / (100 - recentZoneStart);
+			const index = recentStartIdx + Math.round(ratio * (recentCount - 1));
+			return Math.max(recentStartIdx, Math.min(maxIndex, index));
+		}
+		
+		const olderDataCount = recentStartIdx; // 최근 9개를 제외한 데이터 개수
+		
+		if (olderDataCount <= 0) {
+			// 데이터가 9개 이하인 경우
+			const ratio = sliderValue / 100;
+			return Math.round(ratio * maxIndex);
+		}
+		
+		const midPointIdx = Math.floor(olderDataCount / 2); // 전체의 50% 지점
+		
+		if (sliderValue >= midZoneStart) {
+			// 52.5-75%: 중간 50% 데이터 (밀집 분포)
+			const ratio = (sliderValue - midZoneStart) / (recentZoneStart - midZoneStart);
+			const index = midPointIdx + Math.round(ratio * (recentStartIdx - midPointIdx - 1));
+			return Math.max(midPointIdx, Math.min(recentStartIdx - 1, index));
+		} else {
+			// 0-52.5%: 가장 오래된 데이터부터 50% 지점까지 일정하게 분포
+			const ratio = sliderValue / midZoneStart;
+			const index = Math.round(ratio * midPointIdx);
+			return Math.max(0, Math.min(midPointIdx, index));
+		}
+	}
+	
+	// 타임스탬프 인덱스를 슬라이더 값으로 변환하는 역함수
+	function indexToSlider(index, maxIndex) {
+		if (maxIndex < 9) {
+			return (index / maxIndex) * 100;
+		}
+		
+		const recentCount = Math.min(9, maxIndex + 1);
+		const recentStartIdx = maxIndex - recentCount + 1;
+		const olderDataCount = recentStartIdx;
+		
+		if (olderDataCount <= 0) {
+			return (index / maxIndex) * 100;
+		}
+		
+		const midPointIdx = Math.floor(olderDataCount / 2);
+		
+		const recentZoneStart = 75;
+		const midZoneStart = 52.5;
+		
+		if (index >= recentStartIdx) {
+			// 최근 9개 구간 (75-100%)
+			const ratio = (index - recentStartIdx) / (recentCount - 1);
+			return recentZoneStart + ratio * (100 - recentZoneStart);
+		} else if (index >= midPointIdx) {
+			// 중간 50% 구간 (52.5-75%)
+			const ratio = (index - midPointIdx) / (recentStartIdx - midPointIdx);
+			return midZoneStart + ratio * (recentZoneStart - midZoneStart);
+		} else {
+			// 0-50% 구간 (0-52.5%)
+			const ratio = index / midPointIdx;
+			return ratio * midZoneStart;	}
+}
 
-			if (rawTimestamps.length >= 2) {
-				const min_index = 0;
-				const max_index = rawTimestamps.length - 1;
-				let start1_index = timestampMap[currentTs1];
-				let start2_index = timestampMap[currentTs2];
+document.addEventListener('DOMContentLoaded', function() {		const slider = document.getElementById('timeSlider');
+		const input1 = document.getElementById('timestamp1');
+		const input2 = document.getElementById('timestamp2');
+		const display1 = document.getElementById('slider-timestamp1');
+		const display2 = document.getElementById('slider-timestamp2');
 
-				const start1 = (start1_index === undefined) ? rawTimestamps.length - 2 : start1_index;
-				const start2 = (start2_index === undefined) ? rawTimestamps.length - 1 : start2_index;
+		if (rawTimestamps.length >= 2) {
+			const min_index = 0;
+			const max_index = rawTimestamps.length - 1;
+			let start1_index = timestampMap[currentTs1];
+			let start2_index = timestampMap[currentTs2];
 
-				noUiSlider.create(slider, {
-					start: [start1, start2], 
-					connect: true,
-					step: 1, 
-					range: {
-						'min': 0,
-						'max': rawTimestamps.length - 1
-					},
-					pips: { 
-						mode: 'count',
-						values: 5,
-						density: 4
-					}
-				});
-
-				slider.noUiSlider.on('update', function (values, handle) {
-					const index1 = Math.round(values[0]);
-					const index2 = Math.round(values[1]);
-					
-					const newTs1 = rawTimestamps[index1];
-					const newTs2 = rawTimestamps[index2];
-					
-					input1.value = newTs1;
-					input2.value = newTs2;
-					
-					display1.textContent = formattedTimestamps[newTs1] || newTs1;
-					display2.textContent = formattedTimestamps[newTs2] || newTs2;
-					
-					const handles = slider.getElementsByClassName('noUi-handle');
-					
-					if (handles[0]) {
-						if (index1 === min_index) {
-							handles[0].classList.add('red-indicator');
-						} else {
-							handles[0].classList.remove('red-indicator');
-						}
-					}
-				
-					if (handles[1]) {
-						if (index2 === max_index) {
-							handles[1].classList.add('red-indicator');
-						} else {
-							handles[1].classList.remove('red-indicator');
-						}
-					}
-				});
-			} else {
-				document.getElementById('timeSlider').innerHTML = '<p class="text-warning">비교 가능한 타임스탬프 데이터가 부족합니다.</p>';
-			}
+			const start1_idx = (start1_index === undefined) ? rawTimestamps.length - 2 : start1_index;
+			const start2_idx = (start2_index === undefined) ? rawTimestamps.length - 1 : start2_index;
 			
-			document.getElementById('comparisonForm').addEventListener('submit', function(e) {
-				if (input1.value === input2.value) {
-					e.preventDefault();
-					alert('비교를 위해 서로 다른 시간대를 선택해주세요.');
-					return false;
-				}
-			});
+			// 인덱스를 슬라이더 값으로 변환
+			const start1 = indexToSlider(start1_idx, max_index);
+			const start2 = indexToSlider(start2_idx, max_index);
+
+			noUiSlider.create(slider, {
+				start: [start1, start2], 
+				connect: true,
+				step: 0.1, 
+				range: {
+					'min': 0,
+					'max': 100
+				},
+				pips: { 
+					mode: 'values',
+				values: [0, 50, 75, 100], //display only key points
+				density: 4
+			}
 		});
+
+	slider.noUiSlider.on('update', function (values, handle) {
+		const sliderVal1 = parseFloat(values[0]);
+		const sliderVal2 = parseFloat(values[1]);
+		
+		const index1 = sliderToIndex(sliderVal1, max_index);
+		const index2 = sliderToIndex(sliderVal2, max_index);
+		
+		const newTs1 = rawTimestamps[index1];
+		const newTs2 = rawTimestamps[index2];
+		
+		input1.value = newTs1;
+		input2.value = newTs2;
+		
+		display1.textContent = formattedTimestamps[newTs1] || newTs1;
+		display2.textContent = formattedTimestamps[newTs2] || newTs2;
+		
+		const handles = slider.getElementsByClassName('noUi-handle');
+		
+		if (handles[0]) {
+			if (index1 === min_index) {
+				handles[0].classList.add('red-indicator');
+			} else {
+				handles[0].classList.remove('red-indicator');
+			}
+		}
+	
+		if (handles[1]) {
+			if (index2 === max_index) {
+				handles[1].classList.add('red-indicator');
+			} else {
+				handles[1].classList.remove('red-indicator');
+			}
+		}
+	});
+} else {
+	document.getElementById('timeSlider').innerHTML = '<p class="text-warning">비교 가능한 타임스탬프 데이터가 부족합니다.</p>';
+}
+
+document.getElementById('comparisonForm').addEventListener('submit', function(e) {
+	if (input1.value === input2.value) {
+		e.preventDefault();
+		alert('비교를 위해 서로 다른 시간대를 선택해주세요.');
+		return false;
+	}
+});
+});
     </script>
 	<script>
 		// HTML에서 data-order 속성 추출 또는 텍스트에서 숫자 추출
