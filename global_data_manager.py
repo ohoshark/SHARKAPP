@@ -117,8 +117,8 @@ class GlobalDataManager:
                 ''', (info_name, display_name, image_url, wal_score,
                       cookie_smart_follower, kaito_smart_follower, follower))
             
-            conn.commit()
-    
+            conn.commit()            # WAL 체크포인트 실행 - 변경사항을 메인 DB에 즉시 반영
+            cursor.execute('PRAGMA wal_checkpoint(PASSIVE)')    
     def update_ranking(self, info_name, project_name, timeframe, ms_rank=None, 
                       cms_rank=None, ms=None, cms=None, 
                       position_change=None):
@@ -134,6 +134,8 @@ class GlobalDataManager:
                   ms, cms, position_change))
             
             conn.commit()
+            # WAL 체크포인트 실행 - 변경사항을 메인 DB에 즉시 반영
+            cursor.execute('PRAGMA wal_checkpoint(PASSIVE)')
     
     def search_users(self, query, limit=10):
         """유저 검색 (infoName, displayName 모두 검색) - SQLite 쿼리 기반 (한글 완벽 지원)"""
@@ -345,6 +347,8 @@ class GlobalDataManager:
                 cursor.execute('DROP TABLE rankings_old')
                 
                 conn.commit()
+                # WAL 체크포인트 실행 - 변경사항을 메인 DB에 즉시 반영
+                cursor.execute('PRAGMA wal_checkpoint(PASSIVE)')
                 print("[UnifiedDataManager] 배치 업데이트 완료 - 테이블 교체 성공")
             except Exception as e:
                 conn.rollback()
