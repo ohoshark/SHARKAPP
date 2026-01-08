@@ -63,6 +63,11 @@ KAITO_DB_LOCK = threading.Lock()
 # 종료 플래그 (Ctrl+C 처리용)
 SHUTDOWN_FLAG = threading.Event()
 
+# 글로벌 DB 갱신 트리거 및 쿨다운
+GLOBAL_UPDATE_TRIGGER = threading.Event()
+LAST_GLOBAL_UPDATE = time.time()  # 현재 시간으로 초기화
+GLOBAL_UPDATE_COOLDOWN = 300  # 5분 (초 단위)
+
 def flush_logs():
     """버퍼에 쌓인 로그를 파일에 쓰기"""
     global LOG_LAST_FLUSH
@@ -223,6 +228,7 @@ def start_data_loader_thread(project_name):
                     print(f"[{project_name}] 신규 데이터 발견, 로드 중...")
                     processor.load_data(files_to_load=new_files)
                     print(f"[{project_name}] ✅ 신규 데이터 로드 완료")
+                    GLOBAL_UPDATE_TRIGGER.set()  # 글로벌 DB 갱신 트리거
             except Exception as e:
                 print(f"[{project_name}] 데이터 로드 오류: {e}")
 
@@ -285,6 +291,7 @@ def start_wallchain_loader_thread(project_name):
                     print(f"[Wallchain - {project_name}] 신규 데이터 발견, 로드 중...")
                     processor.load_data(files_to_load=new_files)
                     print(f"[Wallchain - {project_name}] ✅ 신규 데이터 로드 완료")
+                    GLOBAL_UPDATE_TRIGGER.set()  # 글로벌 DB 갱신 트리거
             except Exception as e:
                 print(f"[Wallchain - {project_name}] 데이터 로드 오류: {e}")
 
@@ -568,6 +575,7 @@ def start_kaito_data_loader():
                 if new_data_found:
                     print("[Kaito] ✅ 신규 데이터 로드 완료\n")
                     KAITO_CACHE["list"] = []
+                    GLOBAL_UPDATE_TRIGGER.set()  # 글로벌 DB 갱신 트리거
                     
             except Exception as e:
                 if not SHUTDOWN_FLAG.is_set():
@@ -998,9 +1006,35 @@ def schedule_global_updates():
     
     # 스케줄러 실행
     def run_scheduler():
-        print(f"[글로벌 DB 스케줄러] 백그라운드 실행 시작 - 매 시간 15분에 갱신")
+        global LAST_GLOBAL_UPDATE
+        print(f"[글로벌 DB 스케줄러] 백그라운드 실행 시작")
+        print(f"  - 정기 갱신: 매 시간 15분")
+        print(f"  - 자동 갱신: 신규 데이터 수집 후 {GLOBAL_UPDATE_COOLDOWN//60}분 쿨다운")
+        
         while True:
+            # 정기 스케줄 확인
             schedule.run_pending()
+            
+            # 트리거 확인 (쿨다운 적용)
+            if GLOBAL_UPDATE_TRIGGER.is_set():
+                current_time = time.time()
+                time_since_last = current_time - LAST_GLOBAL_UPDATE
+                
+                if time_since_last > GLOBAL_UPDATE_COOLDOWN:
+                    # 첫 갱신인지 확인 (쿨다운보다 훨씬 큰 경우)
+                    if time_since_last > 86400:  # 24시간 이상
+                        print(f"\n[글로벌 DB] 자동 갱신 트리거 감지 (최초 갱신)")
+                    else:
+                        print(f"\n[글로벌 DB] 자동 갱신 트리거 감지 (마지막 갱신: {int(time_since_last//60)}분 전)")
+                    time.sleep(60)  # 추가 데이터 수집 대기
+                    update_global_rankings()
+                    LAST_GLOBAL_UPDATE = time.time()
+                    GLOBAL_UPDATE_TRIGGER.clear()
+                else:
+                    wait_time = int(GLOBAL_UPDATE_COOLDOWN - time_since_last)
+                    print(f"[글로벌 DB] 쿨다운 중 - {wait_time}초 후 갱신 가능")
+                    GLOBAL_UPDATE_TRIGGER.clear()  # 플래그 리셋
+            
             time.sleep(30)
     
     threading.Thread(target=run_scheduler, daemon=True).start()
