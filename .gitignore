@@ -5,3 +5,4 @@ unified_rankings.db
 *.db
 /static/kaito
 static/kaito.png
+/temp
