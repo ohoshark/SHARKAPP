@@ -68,6 +68,11 @@ GLOBAL_UPDATE_TRIGGER = threading.Event()
 LAST_GLOBAL_UPDATE = time.time()  # 현재 시간으로 초기화
 GLOBAL_UPDATE_COOLDOWN = 300  # 5분 (초 단위)
 
+# 프로젝트 초기 데이터 로드 완료 플래그
+COOKIE_INITIAL_LOAD_DONE = threading.Event()
+WALLCHAIN_INITIAL_LOAD_DONE = threading.Event()
+KAITO_INITIAL_LOAD_DONE = threading.Event()
+
 def flush_logs():
     """버퍼에 쌓인 로그를 파일에 쓰기"""
     global LOG_LAST_FLUSH
@@ -216,6 +221,12 @@ def start_data_loader_thread(project_name):
             print(f"[{project_name}] 초기 데이터 로드 시작...")
             processor.load_data()
             print(f"[{project_name}] ✅ 초기 데이터 로드 완료")
+            
+            # 모든 Cookie 프로젝트의 초기 로드가 완료되었는지 확인
+            all_loaded = all(p in project_instances for p in project_instances)
+            if all_loaded:
+                COOKIE_INITIAL_LOAD_DONE.set()
+                print(f"[Cookie] 모든 프로젝트 초기 로드 완료")
         except Exception as e:
             print(f"[{project_name}] ❌ 초기 데이터 로드 오류: {e}")
         
@@ -279,6 +290,12 @@ def start_wallchain_loader_thread(project_name):
             print(f"[Wallchain - {project_name}] 초기 데이터 로드 시작...")
             processor.load_data()
             print(f"[Wallchain - {project_name}] ✅ 초기 데이터 로드 완료")
+            
+            # 모든 Wallchain 프로젝트의 초기 로드가 완료되었는지 확인
+            all_loaded = all(p in wallchain_instances for p in wallchain_instances)
+            if all_loaded:
+                WALLCHAIN_INITIAL_LOAD_DONE.set()
+                print(f"[Wallchain] 모든 프로젝트 초기 로드 완료")
         except Exception as e:
             print(f"[Wallchain - {project_name}] ❌ 초기 데이터 로드 오류: {e}")
         
@@ -509,8 +526,10 @@ def start_kaito_data_loader():
                     print(f"[Kaito] DB 삽입 완료")
             
             print("[Kaito] ✅ 초기 데이터 로드 완료")
+            KAITO_INITIAL_LOAD_DONE.set()
         except Exception as e:
             print(f"[Kaito] ❌ 초기 로드 오류: {e}")
+            KAITO_INITIAL_LOAD_DONE.set()  # 오류 발생해도 플래그는 설정 (진행을 막지 않음)
         
         # 주기적으로 신규 파일 체크 (30초마다, 병렬 처리)
         while not SHUTDOWN_FLAG.is_set():
@@ -697,13 +716,17 @@ def update_global_rankings():
         rankings_batch = []  # [(infoName, projectName, timeframe, ...)]
         
         # Cookie 프로젝트 데이터 수집
+        cookie_total_users = 0
+        cookie_total_rankings = 0
         for project_name, dp in list(project_instances.items()):
             try:
                 print(f"[Cookie] {project_name} 처리 중...")
+                project_users_before = len(users_batch)
+                project_rankings_before = len(rankings_batch)
                 
                 for timeframe in dp.timeframes:
                     # 최신 타임스탬프의 데이터 가져오기
-                    with sqlite3.connect(dp.db_path) as conn:
+                    with sqlite3.connect(dp.db_path, timeout=30.0) as conn:
                         cursor = conn.cursor()
                         cursor.execute(
                             "SELECT MAX(timestamp) FROM snaps WHERE timeframe = ?",
@@ -712,6 +735,7 @@ def update_global_rankings():
                         latest_ts = cursor.fetchone()[0]
                         
                         if not latest_ts:
+                            print(f"[Cookie] {project_name}/{timeframe} - 데이터 없음")
                             continue
                         
                         # 해당 타임스탬프의 모든 유저 데이터
@@ -724,42 +748,90 @@ def update_global_rankings():
                         ''', (latest_ts, timeframe))
                         
                         rows = cursor.fetchall()
+                        print(f"[Cookie] {project_name}/{timeframe} - {len(rows)}개 레코드 발견 (timestamp: {latest_ts})")
                         
                         for row in rows:
-                            username = row[0]
-                            display_name = row[1]
-                            image_url = row[2]
-                            ms_rank = row[3]  # rank -> ms_rank
-                            cms_rank = row[4]  # cSnapsPercentRank -> cms_rank
-                            ms_percent = row[5]  # snapsPercent -> ms_percent
-                            cms_percent = row[6]  # cSnapsPercent -> cms_percent
-                            followers = row[7] if len(row) > 7 else None
-                            smart_followers = row[8] if len(row) > 8 else None
-                            
-                            # 유저 정보 수집 (wallchain 우선이므로 없을 때만)
-                            if username not in users_batch:
-                                users_batch[username] = (username, display_name, image_url, None,
-                                                        smart_followers, None, followers)
-                            
-                            # 순위 정보 수집
-                            rankings_batch.append((
-                                username, project_name, timeframe, 
-                                ms_rank, cms_rank, ms_percent, cms_percent, None
-                            ))
+                            try:
+                                username = row[0]
+                                if not username or username.strip() == '':
+                                    continue
+                                    
+                                display_name = row[1]
+                                image_url = row[2]
+                                ms_rank = row[3]  # rank -> ms_rank
+                                cms_rank = row[4]  # cSnapsPercentRank -> cms_rank
+                                ms_percent = row[5]  # snapsPercent -> ms_percent
+                                cms_percent = row[6]  # cSnapsPercent -> cms_percent
+                                followers = row[7] if len(row) > 7 else None
+                                smart_followers = row[8] if len(row) > 8 else None
+                                
+                                # 유저 정보 수집 (병합 처리)
+                                if username in users_batch:
+                                    # 이미 있으면 Cookie 팔로워 정보만 업데이트 (Wallchain 데이터는 유지)
+                                    existing = users_batch[username]
+                                    
+                                    # 스마트 팔로워는 이전 값보다 큰 경우에만 업데이트
+                                    existing_smart = existing[4] if existing[4] is not None else 0
+                                    new_smart = smart_followers if smart_followers is not None else 0
+                                    final_smart = max(existing_smart, new_smart) if new_smart > 0 or existing_smart > 0 else None
+                                    
+                                    # 일반 팔로워는 최신 값 우선
+                                    final_follower = followers if followers is not None else existing[6]
+                                    
+                                    # Wallchain 데이터가 있으면 유지 (existing[3]이 None이 아니면 Wallchain)
+                                    if existing[3] is not None:  # wal_score가 있으면 Wallchain 데이터
+                                        # Wallchain 기본 정보 유지, Cookie 팔로워만 업데이트
+                                        users_batch[username] = (username, existing[1], existing[2], existing[3],
+                                                                final_smart,
+                                                                existing[5], 
+                                                                final_follower)
+                                    else:
+                                        # Cookie 데이터끼리 병합 (최신 값 우선)
+                                        users_batch[username] = (username, 
+                                                                display_name if display_name else existing[1],
+                                                                image_url if image_url else existing[2], 
+                                                                None,
+                                                                final_smart,
+                                                                existing[5],
+                                                                final_follower)
+                                else:
+                                    # 없으면 새로 추가
+                                    users_batch[username] = (username, display_name, image_url, None,
+                                                            smart_followers, None, followers)
+                                
+                                # 순위 정보 수집
+                                rankings_batch.append((
+                                    username, project_name, timeframe, 
+                                    ms_rank, cms_rank, ms_percent, cms_percent, None
+                                ))
+                            except Exception as e:
+                                print(f"[Cookie 오류] {project_name}/{timeframe} row 처리 실패: {e}")
                 
-                print(f"[Cookie] {project_name} 완료 ✓")
+                project_users_added = len(users_batch) - project_users_before
+                project_rankings_added = len(rankings_batch) - project_rankings_before
+                cookie_total_users += project_users_added
+                cookie_total_rankings += project_rankings_added
+                print(f"[Cookie] {project_name} 완료 ✓ (유저: +{project_users_added}, 순위: +{project_rankings_added})")
                 
             except Exception as e:
                 print(f"[Cookie] {project_name} 오류: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        print(f"[Cookie 총계] 유저: {cookie_total_users}, 순위: {cookie_total_rankings}")
         
         # Wallchain 프로젝트 데이터 수집
+        wallchain_total_users = 0
+        wallchain_total_rankings = 0
         for project_name, dp in list(wallchain_instances.items()):
             try:
                 print(f"[Wallchain] {project_name} 처리 중...")
+                project_users_before = len(users_batch)
+                project_rankings_before = len(rankings_batch)
                 
                 for timeframe in dp.timeframes:
                     # 최신 타임스탬프의 데이터 가져오기
-                    with sqlite3.connect(dp.db_path) as conn:
+                    with sqlite3.connect(dp.db_path, timeout=30.0) as conn:
                         cursor = conn.cursor()
                         cursor.execute(
                             "SELECT MAX(timestamp) FROM leaderboard WHERE timeframe = ?",
@@ -768,6 +840,7 @@ def update_global_rankings():
                         latest_ts = cursor.fetchone()[0]
                         
                         if not latest_ts:
+                            print(f"[Wallchain] {project_name}/{timeframe} - 데이터 없음")
                             continue
                         
                         # 해당 타임스탬프의 모든 유저 데이터
@@ -779,42 +852,61 @@ def update_global_rankings():
                         ''', (latest_ts, timeframe))
                         
                         rows = cursor.fetchall()
+                        print(f"[Wallchain] {project_name}/{timeframe} - {len(rows)}개 레코드 발견 (timestamp: {latest_ts})")
                         
                         for row in rows:
-                            username = row[0]  # wallchain의 username (실제 X 핸들, infoName으로 사용)
-                            display_name = row[1]  # wallchain의 name (표시 이름)
-                            image_url = row[2]
-                            score = row[3]
-                            position = row[4]
-                            position_change = row[5]
-                            mindshare_percentage = row[6]
-                            
-                            # 유저 정보 수집 (wallchain이 최우선이지만 팔로워 정보는 유지)
-                            if username in users_batch:
-                                # 이미 있으면 wallchain 정보만 업데이트 (팔로워 정보는 유지)
-                                existing = users_batch[username]
-                                users_batch[username] = (username, display_name, image_url, score,
-                                                        existing[4], existing[5], existing[6])  # 팔로워 정보 유지
-                            else:
-                                # 없으면 새로 추가 (팔로워 정보 없음)
-                                users_batch[username] = (username, display_name, image_url, score,
-                                                        None, None, None)
-                            
-                            # 순위 정보 수집
-                            rankings_batch.append((
-                                username, project_name, timeframe,
-                                position, None, mindshare_percentage, None, position_change
-                            ))
+                            try:
+                                username = row[0]  # wallchain의 username (실제 X 핸들, infoName으로 사용)
+                                if not username or username.strip() == '':
+                                    continue
+                                    
+                                display_name = row[1]  # wallchain의 name (표시 이름)
+                                image_url = row[2]
+                                score = row[3]
+                                position = row[4]
+                                position_change = row[5]
+                                mindshare_percentage = row[6]
+                                
+                                # 유저 정보 수집 (wallchain이 최우선이지만 팔로워 정보는 유지)
+                                if username in users_batch:
+                                    # 이미 있으면 wallchain 정보만 업데이트 (팔로워 정보는 유지)
+                                    existing = users_batch[username]
+                                    users_batch[username] = (username, display_name, image_url, score,
+                                                            existing[4], existing[5], existing[6])  # 팔로워 정보 유지
+                                else:
+                                    # 없으면 새로 추가 (팔로워 정보 없음)
+                                    users_batch[username] = (username, display_name, image_url, score,
+                                                            None, None, None)
+                                
+                                # 순위 정보 수집
+                                rankings_batch.append((
+                                    username, project_name, timeframe,
+                                    position, None, mindshare_percentage, None, position_change
+                                ))
+                            except Exception as e:
+                                print(f"[Wallchain 오류] {project_name}/{timeframe} row 처리 실패: {e}")
                 
-                print(f"[Wallchain] {project_name} 완료 ✓")
+                project_users_added = len(users_batch) - project_users_before
+                project_rankings_added = len(rankings_batch) - project_rankings_before
+                wallchain_total_users += project_users_added
+                wallchain_total_rankings += project_rankings_added
+                print(f"[Wallchain] {project_name} 완료 ✓ (유저: +{project_users_added}, 순위: +{project_rankings_added})")
                 
             except Exception as e:
                 print(f"[Wallchain] {project_name} 오류: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        print(f"[Wallchain 총계] 유저: {wallchain_total_users}, 순위: {wallchain_total_rankings}")
         
         # Kaito 프로젝트 데이터 수집
+        kaito_total_users = 0
+        kaito_total_rankings = 0
         if kaito_processor:
             try:
                 print(f"[Kaito] 데이터 수집 중...")
+                kaito_users_before = len(users_batch)
+                kaito_rankings_before = len(rankings_batch)
                 
                 # Kaito DB에서 최신 데이터 가져오기 (최적화된 단일 쿼리)
                 with sqlite3.connect('./data/kaito/kaito_projects.db', timeout=30.0) as conn:
@@ -842,66 +934,124 @@ def update_global_rankings():
                     print(f"[Kaito] 발견된 프로젝트 수: {len(unique_projects)}, 총 레코드: {len(all_rows)}")
                     
                     # 메모리에서 빠르게 처리
+                    success_count = 0
+                    error_count = 0
                     for row in all_rows:
-                        handle = row[0]
-                        display_name = row[1]
-                        image_id = row[2]
-                        rank = row[3]
-                        mindshare_str = row[4]
-                        smart_follower_str = row[5]
-                        follower_str = row[6]
-                        project_name = row[7]
-                        timeframe = row[8]
-                        
-                        # mindshare를 숫자로 변환
                         try:
-                            mindshare_value = float(mindshare_str.rstrip('%'))
-                        except:
-                            mindshare_value = 0.0
-                        
-                        # 팔로워 수를 정수로 변환
-                        try:
-                            smart_follower = int(smart_follower_str.replace(',', '')) if smart_follower_str else None
-                        except:
-                            smart_follower = None
-                        
-                        try:
-                            follower = int(follower_str.replace(',', '')) if follower_str else None
-                        except:
-                            follower = None
-                        
-                        # 이미지 URL 생성
-                        image_url = image_id if image_id else ""
-                        
-                        # 유저 정보 수집
-                        if handle in users_batch:
-                            # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
-                            existing = users_batch[handle]
-                            # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
-                            final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
-                            # kaito_smart_follower와 follower는 None이 아닌 경우에만 업데이트
-                            final_kaito_smart = smart_follower if smart_follower is not None else existing[5]
-                            final_follower = follower if follower is not None else existing[6]
-                            users_batch[handle] = (handle, existing[1], final_image, existing[3],
-                                                  existing[4], final_kaito_smart, final_follower)
-                        else:
-                            # 없으면 새로 추가
-                            users_batch[handle] = (handle, display_name, image_url, None,
-                                                  None, smart_follower, follower)
-                        
-                        # 순위 정보 수집 (kaito- prefix 추가)
-                        full_project_name = f"kaito-{project_name}"
-                        rankings_batch.append((
-                            handle, full_project_name, timeframe,
-                            rank, None, mindshare_value, None, None
-                        ))
+                            handle = row[0]
+                            display_name = row[1]
+                            image_id = row[2]
+                            rank = row[3]
+                            mindshare_str = row[4]
+                            smart_follower_str = row[5]
+                            follower_str = row[6]
+                            project_name_raw = row[7]  # 원본 프로젝트명 (kaito DB에서 조회)
+                            timeframe = row[8]
+                            
+                            # handle 검증 (비어있으면 스킵)
+                            if not handle or handle.strip() == '':
+                                print(f"[Kaito 경고] handle이 비어있음: {row}")
+                                error_count += 1
+                                continue
+                            
+                            # kaito- prefix 추가 (글로벌 DB용)
+                            project_name = f"kaito-{project_name_raw}"
+                            
+                            # mindshare를 숫자로 변환
+                            try:
+                                mindshare_value = float(mindshare_str.rstrip('%')) if mindshare_str else 0.0
+                            except Exception as e:
+                                print(f"[Kaito 경고] mindshare 변환 실패 ({handle}): {mindshare_str} - {e}")
+                                mindshare_value = 0.0
+                            
+                            # 팔로워 수를 정수로 변환
+                            try:
+                                # '-'는 빈 값을 의미하므로 None 처리
+                                if smart_follower_str and smart_follower_str != '-':
+                                    smart_follower = int(smart_follower_str.replace(',', ''))
+                                else:
+                                    smart_follower = None
+                            except Exception as e:
+                                print(f"[Kaito 경고] smart_follower 변환 실패 ({handle}): {smart_follower_str} - {e}")
+                                smart_follower = None
+                            
+                            try:
+                                # '-'는 빈 값을 의미하므로 None 처리
+                                if follower_str and follower_str != '-':
+                                    follower = int(follower_str.replace(',', ''))
+                                else:
+                                    follower = None
+                            except Exception as e:
+                                print(f"[Kaito 경고] follower 변환 실패 ({handle}): {follower_str} - {e}")
+                                follower = None
+                            
+                            # 이미지 URL 생성
+                            image_url = image_id if image_id else ""
+                            
+                            # 유저 정보 수집
+                            if handle in users_batch:
+                                # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
+                                existing = users_batch[handle]
+                                
+                                # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
+                                final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
+                                
+                                # kaito_smart_follower는 이전 값보다 큰 경우에만 업데이트
+                                existing_kaito_smart = existing[5] if existing[5] is not None else 0
+                                new_kaito_smart = smart_follower if smart_follower is not None else 0
+                                final_kaito_smart = max(existing_kaito_smart, new_kaito_smart) if new_kaito_smart > 0 or existing_kaito_smart > 0 else None
+                                
+                                # 일반 팔로워는 최신 값 우선
+                                final_follower = follower if follower is not None else existing[6]
+                                
+                                users_batch[handle] = (handle, existing[1], final_image, existing[3],
+                                                      existing[4], final_kaito_smart, final_follower)
+                            else:
+                                # 없으면 새로 추가
+                                users_batch[handle] = (handle, display_name, image_url, None,
+                                                      None, smart_follower, follower)
+                            
+                            # 순위 정보 수집 (이미 kaito- prefix가 추가된 상태)
+                            rankings_batch.append((
+                                handle, project_name, timeframe,
+                                rank, None, mindshare_value, None, None
+                            ))
+                            success_count += 1
+                            
+                        except Exception as e:
+                            error_count += 1
+                            print(f"[Kaito 오류] row 처리 실패: {row} - {e}")
+                            import traceback
+                            traceback.print_exc()
+                    
+                    print(f"[Kaito] 처리 완료 - 성공: {success_count}, 실패: {error_count}")
                 
-                print(f"[Kaito] 데이터 수집 완료 ✓")
+                kaito_total_users = len(users_batch) - kaito_users_before
+                kaito_total_rankings = len(rankings_batch) - kaito_rankings_before
+                print(f"[Kaito] 데이터 수집 완료 ✓ (유저: +{kaito_total_users}, 순위: +{kaito_total_rankings})")
                 
             except Exception as e:
                 print(f"[Kaito] 데이터 수집 오류: {e}")
                 import traceback
                 traceback.print_exc()
+        else:
+            print(f"[Kaito] kaito_processor가 초기화되지 않음")
+        
+        print(f"[Kaito 총계] 유저: {kaito_total_users}, 순위: {kaito_total_rankings}")
+        
+        # 프로젝트 수 계산
+        cookie_project_count = len(project_instances)
+        wallchain_project_count = len(wallchain_instances)
+        kaito_project_count = len(set([r[1].replace('kaito-', '') for r in rankings_batch if r[1].startswith('kaito-')]))
+        
+        # 최종 요약
+        print(f"\n{'='*60}")
+        print(f"[데이터 수집 완료]")
+        print(f"  Cookie    - {cookie_project_count}개 프로젝트 | 유저: {cookie_total_users}, 순위: {cookie_total_rankings}")
+        print(f"  Wallchain - {wallchain_project_count}개 프로젝트 | 유저: {wallchain_total_users}, 순위: {wallchain_total_rankings}")
+        print(f"  Kaito     - {kaito_project_count}개 프로젝트 | 유저: {kaito_total_users}, 순위: {kaito_total_rankings}")
+        print(f"  총계      - {cookie_project_count + wallchain_project_count + kaito_project_count}개 프로젝트 | 유저: {len(users_batch)}, 순위: {len(rankings_batch)}")
+        print(f"{'='*60}")
         
         # 배치 삽입
         print(f"[글로벌 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
@@ -967,19 +1117,37 @@ def schedule_global_updates():
     # DB가 비어있으면 즉시 갱신, 아니면 5분 후 갱신
     def initial_update():
         try:
-            # 프로젝트 초기화가 완료될 때까지 대기 (최대 60초)
-            print("[글로벌 DB] 프로젝트 초기화 대기 중...")
-            wait_time = 0
-            while (not project_instances or not wallchain_instances) and wait_time < 60:
+            # 프로젝트 초기 데이터 로드가 완료될 때까지 대기
+            print("[글로벌 DB] 프로젝트 초기 데이터 로드 완료 대기 중...")
+            
+            # 각 데이터 소스의 초기 로드 완료 대기 (최대 5분)
+            wait_timeout = 300  # 5분
+            start_wait = time.time()
+            
+            while time.time() - start_wait < wait_timeout:
+                cookie_ready = COOKIE_INITIAL_LOAD_DONE.is_set() or not project_instances
+                wallchain_ready = WALLCHAIN_INITIAL_LOAD_DONE.is_set() or not wallchain_instances
+                kaito_ready = KAITO_INITIAL_LOAD_DONE.is_set() or not kaito_processor
+                
+                if cookie_ready and wallchain_ready and kaito_ready:
+                    break
+                
                 time.sleep(1)
-                wait_time += 1
+            
+            # 타임아웃 후에도 완료되지 않은 소스 확인
+            cookie_status = "✓" if COOKIE_INITIAL_LOAD_DONE.is_set() else "⏳"
+            wallchain_status = "✓" if WALLCHAIN_INITIAL_LOAD_DONE.is_set() else "⏳"
+            kaito_status = "✓" if KAITO_INITIAL_LOAD_DONE.is_set() else "⏳"
+            
+            print(f"[글로벌 DB] 초기 데이터 로드 상태:")
+            print(f"  Cookie:    {cookie_status} ({len(project_instances)}개 프로젝트)")
+            print(f"  Wallchain: {wallchain_status} ({len(wallchain_instances)}개 프로젝트)")
+            kaito_count = len(get_cached_kaito_projects()) if kaito_processor else 0
+            print(f"  Kaito:     {kaito_status} ({kaito_count}개 프로젝트)")
             
             if not project_instances and not wallchain_instances and not kaito_processor:
                 print("[글로벌 DB] 경고: 프로젝트가 초기화되지 않았습니다.")
                 return
-            
-            kaito_count = len(get_cached_kaito_projects()) if kaito_processor else 0
-            print(f"[글로벌 DB] 프로젝트 초기화 완료 - Cookie: {len(project_instances)}, Wallchain: {len(wallchain_instances)}, Kaito: {kaito_count}")
             
             # 데이터베이스에 데이터가 있는지 확인
             conn = sqlite3.connect('./data/global_rankings.db', timeout=30.0)
