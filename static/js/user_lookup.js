@@ -180,7 +180,9 @@ function loadUserData(username) {
     // URL에 username 추가
     const url = new URL(window.location);
     url.searchParams.set('username', username);
-    window.history.pushState({}, '', url);
+    if (window.location.search !== url.search) {
+        window.history.pushState({}, '', url);
+    }
     
     // 사용자 데이터와 YAPS 데이터를 병렬로 가져오기 (서버 프록시 사용)
     Promise.all([
