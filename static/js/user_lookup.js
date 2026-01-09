@@ -463,13 +463,16 @@ function renderUserData(data) {
                 const displayTimeframe = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2').replace('epoch-1', 'epoch1');
                 
                 let changeDisplay = '';
-                if (r.positionChange !== null) {
+                if (r.positionChange === 'new')
+                    changeDisplay = `<span class="position-change text-success">NEW</span>`;
+                else if (r.positionChange !== null) {
                     if (r.positionChange === 0) {
                         changeDisplay = `<span class="position-change text-${changeColor}">(0)</span>`;
                     } else {
                         changeDisplay = `<span class="position-change text-${changeColor}">(${changeIcon}${Math.abs(r.positionChange)})</span>`;
                     }
                 }
+
                 
                 html += `<span class="timeframe-badge">
                     <span class="timeframe-label">${displayTimeframe}</span>
