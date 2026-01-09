@@ -42,6 +42,34 @@
 <html lang="{{lang}}">
 % include('_head.html')
 <link rel="stylesheet" href="/static/css/user.css">
+<style>
+    .user-search-fab {
+        position: absolute;
+        left: 50%;
+        bottom: -18px;
+        transform: translateX(-50%);
+        background: gray;
+        border: 1.5px solid #e0e0e0;
+        border-radius: 2rem;
+        padding: 6px 18px 6px 14px;
+        font-size: 1.05rem;
+        color: #333;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        text-decoration: none;
+        transition: background 0.2s, color 0.2s;
+        z-index: 10;
+    }
+    .user-search-fab:hover {
+        background: #999999;
+        color: #007bff;
+    }
+    .user-search-fab i {
+        font-size: 1.1em;
+    }
+</style>
 <title>{{project.upper()}} {{ user_info.get('displayName', username) }} {{t['user_analysis']}} - SHARKAPP</title>
 </head>
 <body>
@@ -49,7 +77,8 @@
 
 <div class="container mt-4">
     <!-- 사용자 프로필 카드 -->
-    <div class="card mb-4 shadow-sm">
+    <!-- 카드 하단 중앙 모서리에 겹치는 통합 검색 버튼 -->
+    <div class="card mb-4 shadow-sm" style="position:relative;">
         <div class="card-body">
             <div class="row align-items-center">
                 <div class="col-auto">
@@ -77,6 +106,10 @@
                 </div>
             </div>
         </div>
+        <!-- 여기! -->
+        <a href="/user-lookup?username={{username}}" class="user-search-fab" title="global search">
+            <i class="fas fa-search"></i> 통합 검색
+        </a>
     </div>
 
     <!-- 타임프레임별 통계 -->
