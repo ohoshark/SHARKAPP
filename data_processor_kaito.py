@@ -450,23 +450,49 @@ class DataProcessorKaito:
             return [row[0] for row in cursor.fetchall()]
     
     def get_all_users(self, project_name, timeframe=None):
-        """모든 사용자 정보 (handle, displayName)"""
+        """
+        모든 사용자 정보 (handle, displayName)
+        - handle 기준으로 중복 제거
+        - 7D timeframe의 displayName을 우선적으로 사용
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
             if timeframe:
+                # 특정 timeframe만 조회
                 cursor.execute('''
-                    SELECT DISTINCT handle, displayName
+                    SELECT handle, displayName, MAX(timestamp) as latest_ts
                     FROM rankings
                     WHERE projectName = ? AND timeframe = ?
+                    GROUP BY handle
                     ORDER BY handle
                 ''', (project_name, timeframe))
+                return [{'handle': row[0], 'displayName': row[1]} for row in cursor.fetchall()]
             else:
+                # 모든 timeframe에서 조회 (7D 우선)
+                all_users = {}
+                
+                # 7D를 먼저 조회
                 cursor.execute('''
-                    SELECT DISTINCT handle, displayName
+                    SELECT handle, displayName, MAX(timestamp) as latest_ts
                     FROM rankings
-                    WHERE projectName = ?
-                    ORDER BY handle
+                    WHERE projectName = ? AND timeframe = '7D'
+                    GROUP BY handle
                 ''', (project_name,))
-            
-            return [{'handle': row[0], 'displayName': row[1]} for row in cursor.fetchall()]
+                
+                for row in cursor.fetchall():
+                    all_users[row[0]] = {'handle': row[0], 'displayName': row[1]}
+                
+                # 나머지 timeframe에서 7D에 없는 사용자만 추가
+                cursor.execute('''
+                    SELECT handle, displayName, MAX(timestamp) as latest_ts
+                    FROM rankings
+                    WHERE projectName = ? AND timeframe != '7D'
+                    GROUP BY handle
+                ''', (project_name,))
+                
+                for row in cursor.fetchall():
+                    if row[0] not in all_users:
+                        all_users[row[0]] = {'handle': row[0], 'displayName': row[1]}
+                
+                return sorted(all_users.values(), key=lambda x: x['handle'])

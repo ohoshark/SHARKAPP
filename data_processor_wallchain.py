@@ -305,10 +305,21 @@ class DataProcessorWallchain:
             return pd.read_sql(query, conn, params=(latest_ts, timeframe)).to_dict('records')
     
     def get_all_usernames_from_all_timeframes(self):
-        """모든 timeframe에서 사용자를 가져와 중복 제거 후 반환"""
+        """
+        모든 timeframe에서 사용자를 가져와 중복 제거 후 반환
+        - username(handle) 기준으로 중복 제거
+        - epoch-2 (7D) timeframe의 name(displayName)을 우선적으로 사용
+        """
         all_users = {}
+        
+        # epoch-2 (7D)를 가장 우선으로, 나머지는 순서대로 처리
+        priority_order = []
+        if 'epoch-2' in self.timeframes:
+            priority_order.append('epoch-2')
+        priority_order.extend([tf for tf in self.timeframes if tf != 'epoch-2'])
+        
         with sqlite3.connect(self.db_path) as conn:
-            for tf in self.timeframes:
+            for tf in priority_order:
                 cursor = conn.cursor()
                 cursor.execute("SELECT MAX(timestamp) FROM leaderboard WHERE timeframe = ?", (tf,))
                 latest_ts = cursor.fetchone()[0]
@@ -316,10 +327,13 @@ class DataProcessorWallchain:
                     continue
                 query = "SELECT username, name FROM leaderboard WHERE timestamp = ? AND timeframe = ? ORDER BY position ASC"
                 users = pd.read_sql(query, conn, params=(latest_ts, tf)).to_dict('records')
+                
                 for user in users:
-                    # username을 키로 사용하여 중복 제거
-                    if user['username'] not in all_users:
-                        all_users[user['username']] = user
+                    username = user['username']
+                    # epoch-2 (7D) timeframe이거나 아직 등록되지 않은 경우에만 추가/업데이트
+                    if tf == 'epoch-2' or username not in all_users:
+                        all_users[username] = user
+        
         return list(all_users.values())
 
     def get_user_info_by_timeframe(self, username, timeframe='epoch-2'):
