@@ -2815,6 +2815,35 @@ def kaito_user_route(projectname, handle):
         
         for idx, tf in enumerate(timeframes_with_data, 1):
             df = user_data_by_timeframe[tf]
+            
+            # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
+            if len(df) > 0:
+                latest_timestamp = df['timestamp'].max()
+                # 현재 시점의 데이터 확인
+                timestamps_in_tf = kaito_processor.get_available_timestamps(projectname, tf)
+                if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                    try:
+                        # 카이토 타임스탬프 정규화 (get_user_data와 동일한 방식)
+                        # 2026-0109-060000 or 2026_0109_060000 -> 20260109060000 -> datetime
+                        max_ts_str = max(timestamps_in_tf)
+                        # 하이픈과 언더스코어 제거
+                        normalized = max_ts_str.replace('-', '').replace('_', '')
+                        # datetime 변환
+                        current_timestamp = pd.to_datetime(normalized, format='%Y%m%d%H%M%S')
+                        
+                        # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                        if latest_timestamp < current_timestamp:
+                            # 더미 데이터 추가 (rank=9999, mindshare='0%')
+                            dummy_row = pd.DataFrame({
+                                'timestamp': [current_timestamp],
+                                'rank': [9999],
+                                'mindshare': ['0%']
+                            })
+                            df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
+                    except Exception as e:
+                        print(f"[Kaito OUT 처리 오류] {projectname}/{tf} - {e}")
+                        pass
+            
             timestamps = df['timestamp'].tolist()
             ranks = df['rank'].tolist()
             mindshares = df['mindshare'].str.rstrip('%').astype(float).tolist()
