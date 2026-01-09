@@ -66,6 +66,15 @@
 <link rel="stylesheet" href="/static/css/leaderboard.css">
 <title>{{display_project_name}} {{t['title_suffix']}} - SHARKAPP</title>
 <style>
+		/* 테이블 결과 섹션만 로딩 중 깜빡임 방지 */
+		.comparison-table.table-loading {
+			opacity: 0;
+			transition: opacity 0.3s ease-in;
+		}
+		.comparison-table.table-loaded {
+			opacity: 1;
+		}
+		
 		/* DataTables 페이징 컨트롤 스타일 통일 */
 		.dataTables_wrapper .dataTables_length select {
 			padding: 0.375rem 2.25rem 0.375rem 0.75rem;
@@ -169,7 +178,7 @@
 			</div>
 		</div>
         
-        <div class="card comparison-table">
+        <div class="card comparison-table table-loading">
             <div class="card-header">
                 <h3>
                     {{t['result']}} 
@@ -639,6 +648,15 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 				$usernameInput.focus();
 			});
 			twemoji.parse(document.body);
+			
+			// 테이블 결과 섹션만 fade-in
+			setTimeout(function() {
+				const tableCard = document.querySelector('.comparison-table');
+				if (tableCard) {
+					tableCard.classList.remove('table-loading');
+					tableCard.classList.add('table-loaded');
+				}
+			}, 100);
 		});
 	</script>
 
