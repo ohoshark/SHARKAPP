@@ -35,7 +35,7 @@
 %>
 <html lang="{{lang}}">
 % include('_head.html')
-<link rel="stylesheet" href="/static/css/user.css">
+<link rel="stylesheet" href="/static/css/user.css?v2">
 <title>{{display_project_name}} {{ user_info.get('name', username) }} {{t['user_analysis']}} - SHARKAPP</title>
 </head>
 <body>
@@ -43,7 +43,8 @@
 
 <div class="container mt-4">
     <!-- 사용자 프로필 카드 -->
-    <div class="card mb-4 shadow-sm">
+    <!-- 카드 하단 중앙 모서리에 겹치는 통합 검색 버튼 -->
+    <div class="card mb-4 shadow-sm" style="position:relative;">
         <div class="card-body">
             <div class="row align-items-center">
                 <div class="col-auto">
@@ -67,7 +68,13 @@
                 </div>
             </div>
         </div>
+                <!-- 여기! -->
+        <a href="/user-lookup?username={{username}}" class="user-search-fab" title="global search">
+            <i class="fas fa-search"></i> 통합 검색
+        </a>
     </div>
+
+
 
     <!-- 타임프레임별 통계 -->
     <div class="mb-4">
