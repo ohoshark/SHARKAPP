@@ -1770,19 +1770,29 @@ def project_user_analysis(projectname,username):
                     # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
                     if len(df) > 0:
                         latest_timestamp = df['timestamp'].max()
-                        # 현재 시점의 데이터 확인
-                        timestamps_in_tf = dp.get_available_timestamps(tf)
-                        if timestamps_in_tf and len(timestamps_in_tf) > 0:
-                            current_timestamp = pd.Timestamp(max(timestamps_in_tf))
-                            # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
-                            if latest_timestamp < current_timestamp:
-                                # 더미 데이터 추가 (rank=9999, mindshare=0)
-                                dummy_row = pd.DataFrame({
-                                    'timestamp': [current_timestamp],
-                                    rank_col: [9999],
-                                    mindshare_col: [0]
-                                })
-                                df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
+                        latest_row = df.iloc[-1]  # 최신 데이터
+                        latest_mindshare = latest_row[mindshare_col]
+                        
+                        # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
+                        if latest_mindshare == 0 or latest_mindshare == 0.0:
+                            print(f"[Cookie OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                            # 더미 데이터는 이미 있으므로 추가하지 않음
+                            pass
+                        else:
+                            # 타임스탬프 기반 OUT 체크 (이전 로직 유지)
+                            timestamps_in_tf = dp.get_available_timestamps(tf)
+                            if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                                current_timestamp = pd.Timestamp(max(timestamps_in_tf))
+                                # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                                if latest_timestamp < current_timestamp:
+                                    # 더미 데이터 추가 (rank=9999, mindshare=0)
+                                    dummy_row = pd.DataFrame({
+                                        'timestamp': [current_timestamp],
+                                        rank_col: [9999],
+                                        mindshare_col: [0]
+                                    })
+                                    df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
+                                    print(f"[Cookie OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
                     # 1. 순위 변화 (주 Y축: secondary_y=False)
                     fig.add_trace(
                         go.Scatter(
@@ -2379,19 +2389,29 @@ def wallchain_user_analysis(projectname, username):
                     # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
                     if len(data) > 0:
                         latest_timestamp = data['timestamp'].max()
-                        # 현재 시점의 데이터 확인
-                        timestamps_in_tf = dp.get_available_timestamps(tf)
-                        if timestamps_in_tf and len(timestamps_in_tf) > 0:
-                            current_timestamp = pd.Timestamp(max(timestamps_in_tf))
-                            # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
-                            if latest_timestamp < current_timestamp:
-                                # 더미 데이터 추가 (position=9999, mindshare=0)
-                                dummy_row = pd.DataFrame({
-                                    'timestamp': [current_timestamp],
-                                    'position': [9999],
-                                    'mindsharePercentage': [0]
-                                })
-                                data = pd.concat([data, dummy_row], ignore_index=True).sort_values('timestamp')
+                        latest_row = data.iloc[-1]  # 최신 데이터
+                        latest_mindshare = latest_row['mindsharePercentage']
+                        
+                        # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
+                        if latest_mindshare == 0 or latest_mindshare == 0.0:
+                            print(f"[Wallchain OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                            # 더미 데이터는 이미 있으므로 추가하지 않음
+                            pass
+                        else:
+                            # 타임스탬프 기반 OUT 체크 (이전 로직 유지)
+                            timestamps_in_tf = dp.get_available_timestamps(tf)
+                            if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                                current_timestamp = pd.Timestamp(max(timestamps_in_tf))
+                                # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                                if latest_timestamp < current_timestamp:
+                                    # 더미 데이터 추가 (position=9999, mindshare=0)
+                                    dummy_row = pd.DataFrame({
+                                        'timestamp': [current_timestamp],
+                                        'position': [9999],
+                                        'mindsharePercentage': [0]
+                                    })
+                                    data = pd.concat([data, dummy_row], ignore_index=True).sort_values('timestamp')
+                                    print(f"[Wallchain OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
                     fig.add_trace(
                         go.Scatter(
                             x=data['timestamp'], y=data['position'],
@@ -2790,11 +2810,32 @@ def kaito_user_route(projectname, handle):
             df = kaito_processor.get_user_data(projectname, handle, tf)
             if not df.empty:
                 user_data_by_timeframe[tf] = df
-                # 최신 데이터
+                
+                # 최신 데이터 가져오기
                 latest_row = df.iloc[-1]
+                latest_timestamp = df['timestamp'].max()
+                
+                # 현재 시점의 데이터 확인하여 OUT 상태인지 판단
+                timestamps_in_tf = kaito_processor.get_available_timestamps(projectname, tf)
+                is_out = False
+                
+                if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                    try:
+                        # 카이토 타임스탬프 정규화
+                        max_ts_str = max(timestamps_in_tf)
+                        normalized = max_ts_str.replace('-', '').replace('_', '')
+                        current_timestamp = pd.to_datetime(normalized, format='%Y%m%d%H%M%S')
+                        
+                        # 최신 타임스탬프가 현재보다 오래된 경우 OUT 상태
+                        if latest_timestamp < current_timestamp:
+                            is_out = True
+                    except:
+                        pass
+                
+                # OUT 상태면 9999와 '0%'로 표시
                 user_info_by_timeframe[tf] = {
-                    'rank': latest_row['rank'],
-                    'mindshare': latest_row['mindshare']
+                    'rank': 'out' if is_out else latest_row['rank'],
+                    'mindshare': '0%' if is_out else latest_row['mindshare']
                 }
         except Exception as e:
             print(f"[ERROR] Failed to get data for {handle} in {tf}: {e}")
@@ -2819,30 +2860,42 @@ def kaito_user_route(projectname, handle):
             # 이전 데이터가 있지만 현재 OUT 상태인 경우 더미 데이터 추가
             if len(df) > 0:
                 latest_timestamp = df['timestamp'].max()
-                # 현재 시점의 데이터 확인
-                timestamps_in_tf = kaito_processor.get_available_timestamps(projectname, tf)
-                if timestamps_in_tf and len(timestamps_in_tf) > 0:
-                    try:
-                        # 카이토 타임스탬프 정규화 (get_user_data와 동일한 방식)
-                        # 2026-0109-060000 or 2026_0109_060000 -> 20260109060000 -> datetime
-                        max_ts_str = max(timestamps_in_tf)
-                        # 하이픈과 언더스코어 제거
-                        normalized = max_ts_str.replace('-', '').replace('_', '')
-                        # datetime 변환
-                        current_timestamp = pd.to_datetime(normalized, format='%Y%m%d%H%M%S')
-                        
-                        # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
-                        if latest_timestamp < current_timestamp:
-                            # 더미 데이터 추가 (rank=9999, mindshare='0%')
-                            dummy_row = pd.DataFrame({
-                                'timestamp': [current_timestamp],
-                                'rank': [9999],
-                                'mindshare': ['0%']
-                            })
-                            df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
-                    except Exception as e:
-                        print(f"[Kaito OUT 처리 오류] {projectname}/{tf} - {e}")
-                        pass
+                latest_row = df.iloc[-1]  # 최신 데이터
+                # mindshare는 '5.2%' 같은 문자열 형식
+                latest_mindshare_str = latest_row['mindshare']
+                latest_mindshare = float(latest_mindshare_str.rstrip('%')) if latest_mindshare_str else 0.0
+                
+                # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
+                if latest_mindshare == 0 or latest_mindshare == 0.0:
+                    print(f"[Kaito OUT 처리] {handle}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                    # 더미 데이터는 이미 있으므로 추가하지 않음
+                    pass
+                else:
+                    # 타임스탬프 기반 OUT 체크 (이전 로직 유지)
+                    timestamps_in_tf = kaito_processor.get_available_timestamps(projectname, tf)
+                    if timestamps_in_tf and len(timestamps_in_tf) > 0:
+                        try:
+                            # 카이토 타임스탬프 정규화 (get_user_data와 동일한 방식)
+                            # 2026-0109-060000 or 2026_0109_060000 -> 20260109060000 -> datetime
+                            max_ts_str = max(timestamps_in_tf)
+                            # 하이픈과 언더스코어 제거
+                            normalized = max_ts_str.replace('-', '').replace('_', '')
+                            # datetime 변환
+                            current_timestamp = pd.to_datetime(normalized, format='%Y%m%d%H%M%S')
+                            
+                            # 최신 타임스탬프가 현재보다 오래된 경우 (OUT 상태)
+                            if latest_timestamp < current_timestamp:
+                                # 더미 데이터 추가 (rank=9999, mindshare='0%')
+                                dummy_row = pd.DataFrame({
+                                    'timestamp': [current_timestamp],
+                                    'rank': [9999],
+                                    'mindshare': ['0%']
+                                })
+                                df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
+                                print(f"[Kaito OUT 처리] {handle}/{tf} - 타임스탬프 기준 더미 데이터 추가")
+                        except Exception as e:
+                            print(f"[Kaito OUT 처리 오류] {projectname}/{tf} - {e}")
+                            pass
             
             timestamps = df['timestamp'].tolist()
             ranks = df['rank'].tolist()
