@@ -920,6 +920,8 @@ def update_global_rankings():
                     cursor = conn.cursor()
                     
                     # 한 번의 쿼리로 모든 최신 데이터 가져오기 (JOIN 사용)
+                    print(f"[Kaito] 최신 데이터 쿼리 실행 중...")
+                    query_start = time.time()
                     cursor.execute('''
                         SELECT r.handle, r.displayName, r.imageId, r.rank, r.mindshare, 
                                r.smartFollower, r.follower, r.projectName, r.timeframe
@@ -935,103 +937,106 @@ def update_global_rankings():
                     ''')
                     
                     all_rows = cursor.fetchall()
+                    query_time = time.time() - query_start
                     
                     # 고유 프로젝트 수 계산
                     unique_projects = set(row[7] for row in all_rows)
-                    print(f"[Kaito] 발견된 프로젝트 수: {len(unique_projects)}, 총 레코드: {len(all_rows)}")
+                    print(f"[Kaito] 쿼리 완료 ({query_time:.2f}초) - 프로젝트: {len(unique_projects)}개, 레코드: {len(all_rows):,}개")
                     
-                    # 메모리에서 빠르게 처리
+                    # 청크 단위로 빠르게 처리
                     success_count = 0
                     error_count = 0
-                    for row in all_rows:
-                        try:
-                            handle = row[0]
-                            display_name = row[1]
-                            image_id = row[2]
-                            rank = row[3]
-                            mindshare_str = row[4]
-                            smart_follower_str = row[5]
-                            follower_str = row[6]
-                            project_name_raw = row[7]  # 원본 프로젝트명 (kaito DB에서 조회)
-                            timeframe = row[8]
-                            
-                            # handle 검증 (비어있으면 스킵)
-                            if not handle or handle.strip() == '':
-                                print(f"[Kaito 경고] handle이 비어있음: {row}")
-                                error_count += 1
-                                continue
-                            
-                            # kaito- prefix 추가 (글로벌 DB용)
-                            project_name = f"kaito-{project_name_raw}"
-                            
-                            # mindshare를 숫자로 변환
-                            try:
-                                mindshare_value = float(mindshare_str.rstrip('%')) if mindshare_str else 0.0
-                            except Exception as e:
-                                print(f"[Kaito 경고] mindshare 변환 실패 ({handle}): {mindshare_str} - {e}")
-                                mindshare_value = 0.0
-                            
-                            # 팔로워 수를 정수로 변환
-                            try:
-                                # '-'는 빈 값을 의미하므로 None 처리
-                                if smart_follower_str and smart_follower_str != '-':
-                                    smart_follower = int(smart_follower_str.replace(',', ''))
-                                else:
-                                    smart_follower = None
-                            except Exception as e:
-                                print(f"[Kaito 경고] smart_follower 변환 실패 ({handle}): {smart_follower_str} - {e}")
-                                smart_follower = None
-                            
-                            try:
-                                # '-'는 빈 값을 의미하므로 None 처리
-                                if follower_str and follower_str != '-':
-                                    follower = int(follower_str.replace(',', ''))
-                                else:
-                                    follower = None
-                            except Exception as e:
-                                print(f"[Kaito 경고] follower 변환 실패 ({handle}): {follower_str} - {e}")
-                                follower = None
-                            
-                            # 이미지 URL 생성
-                            image_url = image_id if image_id else ""
-                            
-                            # 유저 정보 수집
-                            if handle in users_batch:
-                                # 이미 있으면 kaito 정보만 업데이트 (다른 정보는 유지)
-                                existing = users_batch[handle]
-                                
-                                # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
-                                final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
-                                
-                                # kaito_smart_follower는 이전 값보다 큰 경우에만 업데이트
-                                existing_kaito_smart = existing[5] if existing[5] is not None else 0
-                                new_kaito_smart = smart_follower if smart_follower is not None else 0
-                                final_kaito_smart = max(existing_kaito_smart, new_kaito_smart) if new_kaito_smart > 0 or existing_kaito_smart > 0 else None
-                                
-                                # 일반 팔로워는 최신 값 우선
-                                final_follower = follower if follower is not None else existing[6]
-                                
-                                users_batch[handle] = (handle, existing[1], final_image, existing[3],
-                                                      existing[4], final_kaito_smart, final_follower)
-                            else:
-                                # 없으면 새로 추가
-                                users_batch[handle] = (handle, display_name, image_url, None,
-                                                      None, smart_follower, follower)
-                            
-                            # 순위 정보 수집 (이미 kaito- prefix가 추가된 상태)
-                            rankings_batch.append((
-                                handle, project_name, timeframe,
-                                rank, None, mindshare_value, None, None
-                            ))
-                            success_count += 1
-                            
-                        except Exception as e:
-                            error_count += 1
-                            print(f"[Kaito 오류] row 처리 실패: {row} - {e}")
-                            import traceback
-                            traceback.print_exc()
+                    chunk_size = 5000  # 5000개씩 처리
+                    total_chunks = (len(all_rows) + chunk_size - 1) // chunk_size
                     
-                    print(f"[Kaito] 처리 완료 - 성공: {success_count}, 실패: {error_count}")
+                    process_start = time.time()
+                    for chunk_idx in range(total_chunks):
+                        chunk_start_idx = chunk_idx * chunk_size
+                        chunk_end_idx = min(chunk_start_idx + chunk_size, len(all_rows))
+                        chunk = all_rows[chunk_start_idx:chunk_end_idx]
+                        
+                        if chunk_idx % 5 == 0 or chunk_idx == total_chunks - 1:  # 5청크마다 또는 마지막
+                            elapsed = time.time() - process_start
+                            progress = (chunk_idx + 1) / total_chunks * 100
+                            print(f"[Kaito] 처리 중... {chunk_idx+1}/{total_chunks} ({progress:.1f}%) - {success_count:,}개 완료 ({elapsed:.2f}초)")
+                        
+                        for row in chunk:
+                            try:
+                                handle = row[0]
+                                
+                                # handle 검증 (비어있으면 스킵)
+                                if not handle or handle.strip() == '':
+                                    error_count += 1
+                                    continue
+                                
+                                display_name = row[1]
+                                image_id = row[2]
+                                rank = row[3]
+                                mindshare_str = row[4]
+                                smart_follower_str = row[5]
+                                follower_str = row[6]
+                                project_name_raw = row[7]
+                                timeframe = row[8]
+                                
+                                # kaito- prefix 추가 (글로벌 DB용)
+                                project_name = f"kaito-{project_name_raw}"
+                                
+                                # mindshare를 숫자로 변환 (간결하게)
+                                mindshare_value = float(mindshare_str.rstrip('%')) if mindshare_str else 0.0
+                                
+                                # 팔로워 수를 정수로 변환 (간결하게)
+                                smart_follower = None
+                                if smart_follower_str and smart_follower_str != '-':
+                                    try:
+                                        smart_follower = int(smart_follower_str.replace(',', ''))
+                                    except:
+                                        pass
+                                
+                                follower = None
+                                if follower_str and follower_str != '-':
+                                    try:
+                                        follower = int(follower_str.replace(',', ''))
+                                    except:
+                                        pass
+                                
+                                # 이미지 URL 생성
+                                image_url = image_id if image_id else ""
+                                
+                                # 유저 정보 수집
+                                if handle in users_batch:
+                                    existing = users_batch[handle]
+                                    
+                                    # 이미지는 숫자 ID가 아닌 경우만 유지 (wallchain/cookie 우선)
+                                    final_image = existing[2] if existing[2] and not existing[2].isdigit() else image_url
+                                    
+                                    # kaito_smart_follower는 이전 값보다 큰 경우에만 업데이트
+                                    existing_kaito_smart = existing[5] if existing[5] is not None else 0
+                                    new_kaito_smart = smart_follower if smart_follower is not None else 0
+                                    final_kaito_smart = max(existing_kaito_smart, new_kaito_smart) if new_kaito_smart > 0 or existing_kaito_smart > 0 else None
+                                    
+                                    # 일반 팔로워는 최신 값 우선
+                                    final_follower = follower if follower is not None else existing[6]
+                                    
+                                    users_batch[handle] = (handle, existing[1], final_image, existing[3],
+                                                          existing[4], final_kaito_smart, final_follower)
+                                else:
+                                    users_batch[handle] = (handle, display_name, image_url, None,
+                                                          None, smart_follower, follower)
+                                
+                                # 순위 정보 수집
+                                rankings_batch.append((
+                                    handle, project_name, timeframe,
+                                    rank, None, mindshare_value, None, None
+                                ))
+                                success_count += 1
+                                
+                            except Exception as e:
+                                error_count += 1
+                                if error_count <= 5:  # 처음 5개 에러만 출력
+                                    print(f"[Kaito 경고] row 처리 실패: {e}")
+                    
+                    process_time = time.time() - process_start
+                    print(f"[Kaito] 처리 완료 ({process_time:.2f}초) - 성공: {success_count:,}, 실패: {error_count}")
                 
                 kaito_total_users = len(users_batch) - kaito_users_before
                 kaito_total_rankings = len(rankings_batch) - kaito_rankings_before
