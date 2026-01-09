@@ -479,9 +479,272 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 						}
 					}
 				});
+				
+				$('.dataTables_wrapper').addClass('no-footer');
+
+				let currentSortColumn = 2; 
+				let currentSortDirection = 'asc'; 
+
+				const initialIndicator = (currentSortDirection === 'desc') ? ' ▲' : ' ▼';
+				const defaultSortOption = $('.sort-option[data-column="' + currentSortColumn + '"]');
+				if (defaultSortOption.length) {
+					defaultSortOption.text(defaultSortOption.text() + initialIndicator);
+				}
+				$('#fabSortDropdown i').removeClass().addClass('fas fa-sort-amount-down-alt');
+				
+				$('.sort-option').on('click', function(e) {
+					e.preventDefault();
+					
+					if (!table) {
+						console.warn('Table not initialized');
+						return;
+					}
+					
+					const requestedColumn = parseInt($(this).data('column'));
+					const defaultDirection = $(this).data('default-dir') || 'desc'; 
+					let newDirection;
+
+					if (requestedColumn === currentSortColumn) {
+						newDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
+					} else {
+						newDirection = defaultDirection;
+					}
+
+					$('.sort-option').each(function() {
+						let text = $(this).text().replace(' ▲', '').replace(' ▼', '');
+						$(this).text(text);
+					});
+
+					table.order([requestedColumn, newDirection]).draw();
+
+					currentSortColumn = requestedColumn;
+					currentSortDirection = newDirection;
+
+					const indicator = (newDirection === 'asc') ? ' ▲' : ' ▼';
+					const currentText = $(this).text();
+					$(this).text(currentText + indicator);
+
+					const iconClass = (newDirection === 'asc') ? 'fa-sort-amount-up-alt' : 'fa-sort-amount-down-alt';
+					$('#fabSortDropdown i').removeClass().addClass('fas ' + iconClass);
+				});
+			} else {
+				console.warn('Leaderboard table not found - FAB sort will not work');
 			}
+			
+			// User search functionality
+			const $usernameInput = $('#usernameInput');
+			const $searchResults = $('#searchResults');
+			const searchModalElement = document.getElementById('searchModal');
+			const searchModal = new bootstrap.Modal(searchModalElement);
+				
+			function searchUsers(query) {
+				$searchResults.empty();
+				if (query.length < 2) { 
+					$searchResults.append('<div class="list-group-item">최소 2글자 이상 입력해주세요.</div>');
+					return;
+				}
+
+				const lowerQuery = query.toLowerCase();
+				const foundUsers = [];
+				
+				table.rows().every(function() { 
+					const rowData = this.data();
+					const username = $('<div>' + rowData[0] + '</div>').text().trim(); 
+					
+					if (username.toLowerCase().includes(lowerQuery)) {
+						foundUsers.push({
+							username: username,
+							index: this.index()
+						});
+					}
+				});
+
+				if (foundUsers.length === 0) {
+					$searchResults.append('<div class="list-group-item list-group-item-warning">일치하는 사용자가 없습니다.</div>');
+					return;
+				}
+
+				foundUsers.forEach(function(user) {
+					const $item = $(
+						'<a href="#" class="list-group-item list-group-item-action" ' +
+						'data-username="' + user.username + '">' + 
+						user.username + '</a>'
+					);
+					$searchResults.append($item);
+				});
+			}
+
+			let searchTimer;
+			$usernameInput.on('keyup', function() {
+				clearTimeout(searchTimer);
+				const query = $usernameInput.val().trim();
+				searchTimer = setTimeout(function() {
+					searchUsers(query);
+				}, 300);
+			});
+
+			$searchResults.on('click', 'a.list-group-item-action', function(e) {
+				e.preventDefault();
+				const usernameToFind = $(this).data('username');
+				let targetRowIndex = null;
+
+				// 전체 행에서 해당 사용자 찾기
+				table.rows().every(function() {
+					const rowData = this.data();
+					const cellText = $('<div>' + rowData[0] + '</div>').text().trim(); 
+					if (cellText === usernameToFind) {
+						targetRowIndex = this.index();
+						return false; 
+					}
+				});
+
+				if (targetRowIndex !== null) {
+					searchModal.hide();
+					
+					setTimeout(function() {
+						$('.modal-backdrop').remove();
+						$('body').removeClass('modal-open');
+						$('body').css({'overflow': 'auto', 'padding-right': ''});
+					}, 100);
+					
+					setTimeout(function() {
+						// 해당 행이 있는 페이지로 이동
+						const pageInfo = table.page.info();
+						const pageSize = pageInfo.length;
+						const targetPage = Math.floor(targetRowIndex / pageSize);
+						
+						// 페이지 이동 (false = 페이지 번호 리셋 안 함)
+						table.page(targetPage).draw(false);
+						
+						// 페이지 이동 후 DOM이 업데이트되면 스크롤
+						setTimeout(function() {
+							const $targetRow = $(table.row(targetRowIndex).node());
+							
+							if ($targetRow && $targetRow.length) {
+								$('html, body').animate({
+									scrollTop: $targetRow.offset().top - 150 
+								}, 500);
+
+								$targetRow.addClass('table-warning');
+								setTimeout(function() {
+									$targetRow.removeClass('table-warning');
+								}, 2000);
+							}
+						}, 100);
+					}, 300);
+				}
+			});
+
+			searchModalElement.addEventListener('shown.bs.modal', function () {
+				$usernameInput.focus();
+			});
+			twemoji.parse(document.body);
 		});
 	</script>
+
+<div class="fixed-bottom d-flex flex-column align-items-end p-4" style="z-index: 1050; left:auto;">
+    <div class="dropdown dropup mb-3">
+        <button class="btn btn-primary btn-lg rounded-circle shadow-lg fab-custom-size" 
+                type="button" 
+                id="fabSortDropdown" 
+                data-bs-toggle="dropdown" 
+                data-bs-auto-close="true"
+                aria-expanded="false"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-sort-amount-down-alt"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="fabSortDropdown" style="z-index: 1051; position: absolute; bottom: 100%; margin-bottom: 0.5rem;">
+            <li class="dropdown-header">정렬 기준 선택</li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="1" data-default-dir="asc">{{t['pre_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="2" data-default-dir="asc">{{t['curr_rank']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="3" data-default-dir="desc">{{t['rank_change']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="4" data-default-dir="desc">{{t['pre']}} {{t['ms']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="5" data-default-dir="desc">{{t['cur']}} {{t['ms']}}</a></li>
+            <li><a class="dropdown-item sort-option" href="#" data-column="6" data-default-dir="desc">{{t['ms']}} {{t['change']}}</a></li>
+        </ul>
+    </div>
+    
+    <div class="d-flex align-items-center">
+		<button class="btn btn-secondary btn-lg rounded-circle shadow-lg me-3 fab-custom-size" 
+				type="button" 
+				id="fabScrollTop" 
+				style="background-color: #6c757d !important; border-color: #6c757d !important; display: none;"> 
+			<i class="fas fa-arrow-up"></i>
+		</button>
+        
+        <button class="btn btn-info btn-lg rounded-circle shadow-lg fab-custom-size" 
+                type="button" 
+                data-bs-toggle="modal" 
+                data-bs-target="#searchModal"
+                style="width: 60px; height: 60px;">
+            <i class="fas fa-search"></i>
+        </button> 
+    </div>
+</div>
+
 % include('_footer.html')
+<div class="modal fade" id="searchModal" tabindex="-1" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{t['user_analysis']}}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">{{t['user']}}:</label>
+                    <input type="text" class="form-control" id="usernameInput" placeholder="{{t['search_placeholder']}}" autocomplete="off">
+                </div>
+                <div id="searchResults" class="list-group" style="max-height: 300px; overflow-y: auto;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{t['close']}}</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+	const scrollTopButton = document.getElementById('fabScrollTop');
+	const scrollThreshold = 300; 
+
+	window.addEventListener('scroll', function() {
+		if (window.scrollY > scrollThreshold) {
+			scrollTopButton.style.display = 'flex';
+		} else {
+			scrollTopButton.style.display = 'none';
+		}
+	});
+
+	scrollTopButton.addEventListener('click', function(e) {
+		e.preventDefault();
+		$('html, body').animate({
+			scrollTop: 0
+		}, 500); 
+	});
+	
+	function updateFilters() {
+		// 1. 현재 선택된 timeframe만 가져옴
+		const tf = document.getElementById('timeframe').value;
+		
+		// 2. 프로젝트 경로
+		const project = "{{project}}";
+		
+		// 3. timestamp를 제외한 순수 timeframe만 쿼리 스트링으로 구성
+		// window.location.pathname을 사용하여 현재 주소 뒤의 파라미터를 초기화함
+		window.location.href = window.location.pathname + "?timeframe=" + tf;
+	}
+
+	function resetToRecent() {
+		// updateFilters를 재사용하여 timestamp를 초기화
+		updateFilters();
+	}
+</script>
+<script>
+  $(document).ready(function() {
+    twemoji.parse(document.body);
+  });
+</script>
+
 </body>
 </html>
