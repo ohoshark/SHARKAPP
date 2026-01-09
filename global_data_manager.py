@@ -29,21 +29,7 @@ class GlobalDataManager:
                     follower INTEGER
                 )
             ''')
-            
-            # 기존 테이블에 컬럼 추가 (이미 있으면 무시)
-            try:
-                cursor.execute('ALTER TABLE users ADD COLUMN cookie_smart_follower INTEGER')
-            except:
-                pass
-            try:
-                cursor.execute('ALTER TABLE users ADD COLUMN kaito_smart_follower INTEGER')
-            except:
-                pass
-            try:
-                cursor.execute('ALTER TABLE users ADD COLUMN follower INTEGER')
-            except:
-                pass
-            
+                      
             # 순위 정보 테이블
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS rankings (
@@ -326,13 +312,22 @@ class GlobalDataManager:
             # 트랜잭션으로 한번에 교체
             cursor.execute('BEGIN IMMEDIATE')
             try:
-                # 기존 테이블 삭제
+                # 기존 old 테이블 삭제 (이전 실패 시 남아있을 수 있음)
                 cursor.execute('DROP TABLE IF EXISTS users_old')
                 cursor.execute('DROP TABLE IF EXISTS rankings_old')
                 
-                # 현재 테이블을 old로 변경
-                cursor.execute('ALTER TABLE users RENAME TO users_old')
-                cursor.execute('ALTER TABLE rankings RENAME TO rankings_old')
+                # 현재 테이블이 존재하는지 확인
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+                users_exists = cursor.fetchone() is not None
+                
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rankings'")
+                rankings_exists = cursor.fetchone() is not None
+                
+                # 현재 테이블이 있으면 old로 변경, 없으면 스킵
+                if users_exists:
+                    cursor.execute('ALTER TABLE users RENAME TO users_old')
+                if rankings_exists:
+                    cursor.execute('ALTER TABLE rankings RENAME TO rankings_old')
                 
                 # 임시 테이블을 실제 테이블로 변경
                 cursor.execute('ALTER TABLE users_temp RENAME TO users')
@@ -342,9 +337,11 @@ class GlobalDataManager:
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_rankings_infoName ON rankings(infoName)')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_displayName ON users(displayName)')
                 
-                # old 테이블 삭제
-                cursor.execute('DROP TABLE users_old')
-                cursor.execute('DROP TABLE rankings_old')
+                # old 테이블 삭제 (있는 경우에만)
+                if users_exists:
+                    cursor.execute('DROP TABLE users_old')
+                if rankings_exists:
+                    cursor.execute('DROP TABLE rankings_old')
                 
                 conn.commit()
                 # WAL 체크포인트 실행 - 변경사항을 메인 DB에 즉시 반영

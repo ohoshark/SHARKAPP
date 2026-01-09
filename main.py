@@ -712,7 +712,7 @@ def update_global_rankings():
         global_manager.begin_batch_update()
         
         # 메모리에 데이터 수집
-        users_batch = {}  # {infoName: (infoName, displayName, imageUrl, wal_score)}
+        users_batch = {}  # {infoName: (infoName, displayName, imageUrl, wal_score, cookie_smart, kaito_smart, follower, timestamp)}
         rankings_batch = []  # [(infoName, projectName, timeframe, ...)]
         
         # Cookie 프로젝트 데이터 수집
@@ -765,39 +765,30 @@ def update_global_rankings():
                                 followers = row[7] if len(row) > 7 else None
                                 smart_followers = row[8] if len(row) > 8 else None
                                 
-                                # 유저 정보 수집 (병합 처리)
+                                # 유저 정보 수집 (타임스탬프 비교로 최신 데이터만 반영)
                                 if username in users_batch:
-                                    # 이미 있으면 Cookie 팔로워 정보만 업데이트 (Wallchain 데이터는 유지)
+                                    # 이미 있으면 타임스탬프 비교
                                     existing = users_batch[username]
+                                    existing_timestamp = existing[7] if len(existing) > 7 else None
                                     
-                                    # 스마트 팔로워는 이전 값보다 큰 경우에만 업데이트
-                                    existing_smart = existing[4] if existing[4] is not None else 0
-                                    new_smart = smart_followers if smart_followers is not None else 0
-                                    final_smart = max(existing_smart, new_smart) if new_smart > 0 or existing_smart > 0 else None
-                                    
-                                    # 일반 팔로워는 최신 값 우선
-                                    final_follower = followers if followers is not None else existing[6]
-                                    
-                                    # Wallchain 데이터가 있으면 유지 (existing[3]이 None이 아니면 Wallchain)
-                                    if existing[3] is not None:  # wal_score가 있으면 Wallchain 데이터
-                                        # Wallchain 기본 정보 유지, Cookie 팔로워만 업데이트
-                                        users_batch[username] = (username, existing[1], existing[2], existing[3],
-                                                                final_smart,
-                                                                existing[5], 
-                                                                final_follower)
-                                    else:
-                                        # Cookie 데이터끼리 병합 (최신 값 우선)
+                                    # 타임스탬프 비교: 더 최신 데이터면 모든 정보 업데이트
+                                    if existing_timestamp is None or latest_ts > existing_timestamp:
+                                        # 최신 데이터로 모든 정보 업데이트 (팔로워도 최신값으로)
                                         users_batch[username] = (username, 
                                                                 display_name if display_name else existing[1],
                                                                 image_url if image_url else existing[2], 
-                                                                None,
-                                                                final_smart,
-                                                                existing[5],
-                                                                final_follower)
+                                                                existing[3],  # wal_score 유지
+                                                                smart_followers if smart_followers is not None else existing[4],
+                                                                existing[5],  # kaito_smart_follower 유지
+                                                                followers if followers is not None else existing[6],
+                                                                latest_ts)  # 타임스탬프 저장
+                                    else:
+                                        # 오래된 데이터면 아무것도 변경하지 않음
+                                        pass
                                 else:
-                                    # 없으면 새로 추가
+                                    # 없으면 새로 추가 (타임스탬프 포함)
                                     users_batch[username] = (username, display_name, image_url, None,
-                                                            smart_followers, None, followers)
+                                                            smart_followers, None, followers, latest_ts)
                                 
                                 # 순위 정보 수집
                                 rankings_batch.append((
@@ -867,16 +858,32 @@ def update_global_rankings():
                                 position_change = row[5]
                                 mindshare_percentage = row[6]
                                 
-                                # 유저 정보 수집 (wallchain이 최우선이지만 팔로워 정보는 유지)
+                                # 유저 정보 수집 (wallchain은 wal_score와 기본정보 업데이트, 타임스탬프 비교)
                                 if username in users_batch:
-                                    # 이미 있으면 wallchain 정보만 업데이트 (팔로워 정보는 유지)
+                                    # 이미 있으면 타임스탬프 비교
                                     existing = users_batch[username]
-                                    users_batch[username] = (username, display_name, image_url, score,
-                                                            existing[4], existing[5], existing[6])  # 팔로워 정보 유지
+                                    existing_timestamp = existing[7] if len(existing) > 7 else None
+                                    
+                                    # 타임스탬프 비교: 더 최신 데이터면 기본 정보 업데이트
+                                    if existing_timestamp is None or latest_ts > existing_timestamp:
+                                        # 최신 데이터로 기본 정보 업데이트
+                                        users_batch[username] = (username, 
+                                                                display_name if display_name else existing[1],
+                                                                image_url if image_url else existing[2], 
+                                                                score,  # wal_score 업데이트
+                                                                existing[4],  # cookie_smart_follower 유지
+                                                                existing[5],  # kaito_smart_follower 유지
+                                                                existing[6],  # follower 유지
+                                                                latest_ts)  # 타임스탬프 저장
+                                    else:
+                                        # 오래된 데이터면 팔로워는 유지, wal_score만 업데이트
+                                        users_batch[username] = (existing[0], existing[1], existing[2], 
+                                                                score,  # wal_score는 업데이트 (wallchain 우선)
+                                                                existing[4], existing[5], existing[6], existing_timestamp)
                                 else:
-                                    # 없으면 새로 추가 (팔로워 정보 없음)
+                                    # 없으면 새로 추가 (팔로워 정보 없음, 타임스탬프 포함)
                                     users_batch[username] = (username, display_name, image_url, score,
-                                                            None, None, None)
+                                                            None, None, None, latest_ts)
                                 
                                 # 순위 정보 수집
                                 rankings_batch.append((
@@ -1053,9 +1060,11 @@ def update_global_rankings():
         print(f"  총계      - {cookie_project_count + wallchain_project_count + kaito_project_count}개 프로젝트 | 유저: {len(users_batch)}, 순위: {len(rankings_batch)}")
         print(f"{'='*60}")
         
-        # 배치 삽입
+        # 배치 삽입 (타임스탬프 제거)
         print(f"[글로벌 DB] 배치 삽입 중... (유저: {len(users_batch)}, 순위: {len(rankings_batch)})")
-        global_manager.batch_insert_users(list(users_batch.values()))
+        # users_batch에서 타임스탬프(마지막 요소) 제거
+        users_data_without_timestamp = [(u[0], u[1], u[2], u[3], u[4], u[5], u[6]) for u in users_batch.values()]
+        global_manager.batch_insert_users(users_data_without_timestamp)
         global_manager.batch_insert_rankings(rankings_batch)
         
         # 원자적 교체
@@ -1150,18 +1159,23 @@ def schedule_global_updates():
                 return
             
             # 데이터베이스에 데이터가 있는지 확인
-            conn = sqlite3.connect('./data/global_rankings.db', timeout=30.0)
-            cursor = conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM users')
-            count = cursor.fetchone()[0]
-            conn.close()
-            
-            if count == 0:
-                print("[글로벌 DB] 데이터가 없음 - 즉시 갱신 시작")
-                update_global_rankings()
-            else:
-                print(f"[글로벌 DB] 기존 데이터 {count}개 확인 - 5분 후 갱신 예정")
-                time.sleep(300)  # 5분 대기
+            try:
+                conn = sqlite3.connect('./data/global_rankings.db', timeout=30.0)
+                cursor = conn.cursor()
+                cursor.execute('SELECT COUNT(*) FROM users')
+                count = cursor.fetchone()[0]
+                conn.close()
+                
+                if count == 0:
+                    print("[글로벌 DB] 데이터가 없음 - 즉시 갱신 시작")
+                    update_global_rankings()
+                else:
+                    print(f"[글로벌 DB] 기존 데이터 {count}개 확인 - 5분 후 갱신 예정")
+                    time.sleep(300)  # 5분 대기
+                    update_global_rankings()
+            except sqlite3.OperationalError as e:
+                # 테이블이 없거나 DB 구조 문제 - 즉시 갱신으로 테이블 생성
+                print(f"[글로벌 DB] 테이블 없음 또는 DB 오류 ({e}) - 즉시 갱신 시작")
                 update_global_rankings()
         except Exception as e:
             print(f"[글로벌 DB 초기화 오류] {e}")
