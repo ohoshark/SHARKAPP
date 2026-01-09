@@ -1775,7 +1775,7 @@ def project_user_analysis(projectname,username):
                         
                         # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
                         if latest_mindshare == 0 or latest_mindshare == 0.0:
-                            print(f"[Cookie OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                            # print(f"[Cookie OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
                             # 더미 데이터는 이미 있으므로 추가하지 않음
                             pass
                         else:
@@ -1792,7 +1792,7 @@ def project_user_analysis(projectname,username):
                                         mindshare_col: [0]
                                     })
                                     df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
-                                    print(f"[Cookie OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
+                                    # print(f"[Cookie OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
                     # 1. 순위 변화 (주 Y축: secondary_y=False)
                     fig.add_trace(
                         go.Scatter(
@@ -2394,7 +2394,7 @@ def wallchain_user_analysis(projectname, username):
                         
                         # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
                         if latest_mindshare == 0 or latest_mindshare == 0.0:
-                            print(f"[Wallchain OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                            # print(f"[Wallchain OUT 처리] {username}/{tf} - 마인드쉐어 0으로 OUT 상태")
                             # 더미 데이터는 이미 있으므로 추가하지 않음
                             pass
                         else:
@@ -2411,7 +2411,7 @@ def wallchain_user_analysis(projectname, username):
                                         'mindsharePercentage': [0]
                                     })
                                     data = pd.concat([data, dummy_row], ignore_index=True).sort_values('timestamp')
-                                    print(f"[Wallchain OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
+                                    # print(f"[Wallchain OUT 처리] {username}/{tf} - 타임스탬프 기준 더미 데이터 추가")
                     fig.add_trace(
                         go.Scatter(
                             x=data['timestamp'], y=data['position'],
@@ -2867,7 +2867,7 @@ def kaito_user_route(projectname, handle):
                 
                 # 마인드쉐어가 0이면 OUT 상태 (타임스탬프와 무관)
                 if latest_mindshare == 0 or latest_mindshare == 0.0:
-                    print(f"[Kaito OUT 처리] {handle}/{tf} - 마인드쉐어 0으로 OUT 상태")
+                    # print(f"[Kaito OUT 처리] {handle}/{tf} - 마인드쉐어 0으로 OUT 상태")
                     # 더미 데이터는 이미 있으므로 추가하지 않음
                     pass
                 else:
@@ -2892,7 +2892,7 @@ def kaito_user_route(projectname, handle):
                                     'mindshare': ['0%']
                                 })
                                 df = pd.concat([df, dummy_row], ignore_index=True).sort_values('timestamp')
-                                print(f"[Kaito OUT 처리] {handle}/{tf} - 타임스탬프 기준 더미 데이터 추가")
+                                # print(f"[Kaito OUT 처리] {handle}/{tf} - 타임스탬프 기준 더미 데이터 추가")
                         except Exception as e:
                             print(f"[Kaito OUT 처리 오류] {projectname}/{tf} - {e}")
                             pass
