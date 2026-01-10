@@ -283,88 +283,59 @@ function renderUserData(data) {
     // 통계 그룹들을 순서대로 배열
     const statsGroups = [];
     
-    // 1. Followers + Smart Followers (같은 배경, 두 섹션)
-    if (user.follower || user.kaito_smart_follower || user.cookie_smart_follower) {
-        let followersHtml = '';
-        let smartFollowersHtml = '';
-        
-        // Followers 섹션
-        if (user.follower) {
-            followersHtml = `
-                <div class="stat-subsection">
-                    <small class="text-muted d-block mb-1">Followers</small>
-                    <strong class="d-block">${user.follower.toLocaleString()}</strong>
-                </div>
-            `;
-        }
-        
-        // Smart Followers 섹션
-        if (user.kaito_smart_follower || user.cookie_smart_follower) {
-            let smartFollowerItems = [];
-            if (user.kaito_smart_follower) {
-                smartFollowerItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito</span><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
-            }
-            if (user.cookie_smart_follower) {
-                smartFollowerItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie</span><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
-            }
-            
-            smartFollowersHtml = `
-                <div class="stat-subsection">
-                    <small class="text-muted d-block mb-1">Smart Followers</small>
-                    ${smartFollowerItems.join('')}
-                </div>
-            `;
-        }
-        
-        statsGroups.push(`
-            <div class="stat-group stat-group-combined">
-                ${followersHtml}
-                ${smartFollowersHtml}
+    // 1. Followers + Smart Followers (값이 없어도 항상 표시, 없으면 '?')
+    let followersHtml = `
+        <div class="stat-subsection">
+            <small class="text-muted d-block mb-1">Followers</small>
+            <strong class="d-block">${user.follower !== undefined && user.follower !== null ? user.follower.toLocaleString() : '?'}</strong>
+        </div>
+    `;
+    let smartFollowerItems = [];
+    smartFollowerItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito</span><strong>${user.kaito_smart_follower !== undefined && user.kaito_smart_follower !== null ? user.kaito_smart_follower.toLocaleString() : '?'}</strong></div>`);
+    smartFollowerItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie</span><strong>${user.cookie_smart_follower !== undefined && user.cookie_smart_follower !== null ? user.cookie_smart_follower.toLocaleString() : '?'}</strong></div>`);
+    let smartFollowersHtml = `
+        <div class="stat-subsection">
+            <small class="text-muted d-block mb-1">Smart Followers</small>
+            ${smartFollowerItems.join('')}
+        </div>
+    `;
+    statsGroups.push(`
+        <div class="stat-group stat-group-combined">
+            ${followersHtml}
+            ${smartFollowersHtml}
+        </div>
+    `);
+    
+    // 2. YAPS (값이 없어도 항상 표시, 없으면 '?')
+    let yapsItems = [];
+    const yapsValues = [
+        { label: '24H', value: data.yaps && data.yaps.yaps_l24h },
+        { label: '7D', value: data.yaps && data.yaps.yaps_l7d },
+        { label: '30D', value: data.yaps && data.yaps.yaps_l30d },
+        { label: 'ALL', value: data.yaps && data.yaps.yaps_all }
+    ];
+    yapsValues.forEach(item => {
+        let val = (item.value !== null && item.value !== undefined) ? item.value : null;
+        yapsItems.push(`<div class="stat-item"><span class="stat-label">${item.label}</span><strong>${val !== null ? val.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '?'}</strong></div>`);
+    });
+    statsGroups.push(`
+        <div class="stat-group">
+            <small class="text-muted d-block mb-1">YAPS</small>
+            <div class="yaps-grid">
+                ${yapsItems.join('')}
             </div>
-        `);
-    }
+        </div>
+    `);
     
-    // 2. YAPS
-    if (data.yaps) {
-        let yapsItems = [];
-        
-        // 순서: 24H, 7D, 30D, ALL
-        if (data.yaps.yaps_l24h !== null && data.yaps.yaps_l24h !== undefined && data.yaps.yaps_l24h > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">24H</span><strong>${data.yaps.yaps_l24h.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
-        }
-        if (data.yaps.yaps_l7d !== null && data.yaps.yaps_l7d !== undefined && data.yaps.yaps_l7d > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">7D</span><strong>${data.yaps.yaps_l7d.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
-        }
-        if (data.yaps.yaps_l30d !== null && data.yaps.yaps_l30d !== undefined && data.yaps.yaps_l30d > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">30D</span><strong>${data.yaps.yaps_l30d.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
-        }
-        if (data.yaps.yaps_all !== null && data.yaps.yaps_all !== undefined) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">ALL</span><strong>${data.yaps.yaps_all.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
-        }
-        
-        if (yapsItems.length > 0) {
-            statsGroups.push(`
-                <div class="stat-group">
-                    <small class="text-muted d-block mb-1">YAPS</small>
-                    <div class="yaps-grid">
-                        ${yapsItems.join('')}
-                    </div>
-                </div>
-            `);
-        }
-    }
+    // 3. Wallchain (값이 없어도 항상 표시, 없으면 '?')
+    statsGroups.push(`
+        <div class="stat-group">
+            <small class="text-muted d-block mb-1">Wallchain</small>
+            <div class="stat-item"><span class="stat-label">X SCORE</span><strong>${user.wal_score !== undefined && user.wal_score !== null ? user.wal_score.toLocaleString() : '?'}</strong></div>
+        </div>
+    `);
     
-    // 3. Wallchain (X Score)
-    if (user.wal_score) {
-        statsGroups.push(`
-            <div class="stat-group">
-                <small class="text-muted d-block mb-1">Wallchain</small>
-                <div class="stat-item"><span class="stat-label">X SCORE</span><strong>${user.wal_score.toLocaleString()}</strong></div>
-            </div>
-        `);
-    }
-    
-    // 4. Leaderboards - 실제로 순위가 있는 프로젝트만 계산
+    // 4. Leaderboards (값이 없어도 항상 표시, 없으면 '?')
     let kaitoCount = 0;
     if (data.kaito_projects) {
         Object.keys(data.kaito_projects).forEach(projectName => {
@@ -374,19 +345,16 @@ function renderUserData(data) {
             }
         });
     }
-    
     let cookieCount = 0;
     if (data.cookie_projects) {
         Object.keys(data.cookie_projects).forEach(projectName => {
             const rankings = sortTimeframes(data.cookie_projects[projectName]);
             const msRankings = rankings.filter(r => r.msRank && r.ms > 0);
             const cmsRankings = rankings.filter(r => r.cmsRank && r.cms > 0);
-            // MS 카드와 cMS 카드가 각각 별도로 표시되므로 둘 다 카운트
             if (msRankings.length > 0) cookieCount++;
             if (cmsRankings.length > 0) cookieCount++;
         });
     }
-    
     let wallchainCount = 0;
     if (data.wallchain_projects) {
         Object.keys(data.wallchain_projects).forEach(projectName => {
@@ -396,26 +364,16 @@ function renderUserData(data) {
             }
         });
     }
-    
-    if (kaitoCount > 0 || cookieCount > 0 || wallchainCount > 0) {
-        let leaderboardItems = [];
-        if (kaitoCount > 0) {
-            leaderboardItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito LB</span><strong>${kaitoCount}</strong></div>`);
-        }
-        if (cookieCount > 0) {
-            leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie LB</span><strong>${cookieCount}</strong></div>`);
-        }
-        if (wallchainCount > 0) {
-            leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🦆 Wallchain LB</span><strong>${wallchainCount}</strong></div>`);
-        }
-        
-        statsGroups.push(`
-            <div class="stat-group">
-                <small class="text-muted d-block mb-1">Leaderboards</small>
-                ${leaderboardItems.join('')}
-            </div>
-        `);
-    }
+    let leaderboardItems = [];
+    leaderboardItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito LB</span><strong>${kaitoCount > 0 ? kaitoCount : '?'}</strong></div>`);
+    leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie LB</span><strong>${cookieCount > 0 ? cookieCount : '?'}</strong></div>`);
+    leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🦆 Wallchain LB</span><strong>${wallchainCount > 0 ? wallchainCount : '?'}</strong></div>`);
+    statsGroups.push(`
+        <div class="stat-group">
+            <small class="text-muted d-block mb-1">Leaderboards</small>
+            ${leaderboardItems.join('')}
+        </div>
+    `);
     
     // Kaito 이미지 ID 감지 (숫자만 있는 경우)
     let imageUrl = user.imageUrl;
