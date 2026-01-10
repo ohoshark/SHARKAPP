@@ -280,12 +280,14 @@ function formatCookieProjectName(projectName, suffix) {
 function renderUserData(data) {
     const user = data.user;
     
-    // 통계 데이터 배열 생성 (그룹화된 형태로)
-    const stats = [];
+    // 통계 데이터를 열별로 그룹화
+    const column1 = []; // Follower, Leaderboards
+    const column2 = []; // Smart Follower
+    const column3 = []; // YAPS, Wallchain
     
-    // 1. 팔로워 (단일 항목)
+    // 1. 팔로워 (단일 항목) - Column 1
     if (user.follower) {
-        stats.push(`
+        column1.push(`
             <div class="stat-group">
                 <small class="text-muted d-block mb-1">Followers</small>
                 <strong class="d-block">${user.follower.toLocaleString()}</strong>
@@ -293,7 +295,7 @@ function renderUserData(data) {
         `);
     }
     
-    // 2. 스마트 팔로워 (그룹)
+    // 2. 스마트 팔로워 (그룹) - Column 2
     if (user.kaito_smart_follower || user.cookie_smart_follower) {
         let smartFollowerItems = [];
         if (user.kaito_smart_follower) {
@@ -303,7 +305,7 @@ function renderUserData(data) {
             smartFollowerItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie</span><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
         }
         
-        stats.push(`
+        column2.push(`
             <div class="stat-group">
                 <small class="text-muted d-block mb-1">Smart Followers</small>
                 ${smartFollowerItems.join('')}
@@ -311,24 +313,24 @@ function renderUserData(data) {
         `);
     }
     
-    // 3. YAPS (그룹)
+    // 3. YAPS (그룹) - Column 3
     if (data.yaps) {
         let yapsItems = [];
         if (data.yaps.yaps_all !== null && data.yaps.yaps_all !== undefined) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">ALL</span><strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">ALL</span><strong>${data.yaps.yaps_all.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
         }
         if (data.yaps.yaps_l30d !== null && data.yaps.yaps_l30d !== undefined && data.yaps.yaps_l30d > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">30D</span><strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">30D</span><strong>${data.yaps.yaps_l30d.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
         }
         if (data.yaps.yaps_l7d !== null && data.yaps.yaps_l7d !== undefined && data.yaps.yaps_l7d > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">7D</span><strong>${Math.round(data.yaps.yaps_l7d).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">7D</span><strong>${data.yaps.yaps_l7d.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
         }
         if (data.yaps.yaps_l24h !== null && data.yaps.yaps_l24h !== undefined && data.yaps.yaps_l24h > 0) {
-            yapsItems.push(`<div class="stat-item"><span class="stat-label">24H</span><strong>${Math.round(data.yaps.yaps_l24h).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">24H</span><strong>${data.yaps.yaps_l24h.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`);
         }
         
         if (yapsItems.length > 0) {
-            stats.push(`
+            column3.push(`
                 <div class="stat-group">
                     <small class="text-muted d-block mb-1">YAPS</small>
                     ${yapsItems.join('')}
@@ -337,17 +339,7 @@ function renderUserData(data) {
         }
     }
     
-    // 4. Wallchain (X Score)
-    if (user.wal_score) {
-        stats.push(`
-            <div class="stat-group">
-                <small class="text-muted d-block mb-1">Wallchain</small>
-                <div class="stat-item"><span class="stat-label">X SCORE</span><strong>${user.wal_score.toLocaleString()}</strong></div>
-            </div>
-        `);
-    }
-    
-    // 5. Leaderboard 개수 (그룹) - 실제로 순위가 있는 프로젝트만 계산
+    // 4. Leaderboard 개수 (그룹) - Column 1 - 실제로 순위가 있는 프로젝트만 계산
     let kaitoCount = 0;
     if (data.kaito_projects) {
         Object.keys(data.kaito_projects).forEach(projectName => {
@@ -392,10 +384,20 @@ function renderUserData(data) {
             leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🦆 Wallchain LB</span><strong>${wallchainCount}</strong></div>`);
         }
         
-        stats.push(`
+        column1.push(`
             <div class="stat-group">
                 <small class="text-muted d-block mb-1">Leaderboards</small>
                 ${leaderboardItems.join('')}
+            </div>
+        `);
+    }
+    
+    // 5. Wallchain (X Score) - Column 3
+    if (user.wal_score) {
+        column3.push(`
+            <div class="stat-group">
+                <small class="text-muted d-block mb-1">Wallchain</small>
+                <div class="stat-item"><span class="stat-label">X SCORE</span><strong>${user.wal_score.toLocaleString()}</strong></div>
             </div>
         `);
     }
@@ -410,27 +412,33 @@ function renderUserData(data) {
     let html = `
         <div class="card shadow-sm mb-4">
             <div class="card-body">
-                <div class="row align-items-center">
+                <div class="user-info-header">
                     ${imageUrl ? `
-                        <div class="col-auto">
-                            <img src="${imageUrl}" alt="${user.displayName}" 
-                                 style="width: 80px; height: 80px; border-radius: 50%;" onerror="this.style.display='none'">
-                        </div>
+                        <img src="${imageUrl}" alt="${user.displayName}" 
+                             class="user-profile-image" onerror="this.style.display='none'">
                     ` : ''}
-                    <div class="col">
-                        <h3 class="mb-1">
+                    <div class="user-name-section">
+                        <h3 class="mb-0">
                             <a href="https://x.com/${user.infoName}" target="_blank" class="text-decoration-none">
                                 ${user.displayName || user.infoName}
                             </a>
                         </h3>
-                        <p class="text-muted mb-2">
+                        <p class="text-muted mb-0">
                             <a href="https://x.com/${user.infoName}" target="_blank" class="text-decoration-none">
                               @${user.infoName}
                             </a>
                         </p>
-                        <div class="d-flex gap-4 flex-wrap">
-                            ${stats.join('')}
-                        </div>
+                    </div>
+                </div>
+                <div class="stats-columns">
+                    <div class="stats-column">
+                        ${column1.join('')}
+                    </div>
+                    <div class="stats-column">
+                        ${column2.join('')}
+                    </div>
+                    <div class="stats-column">
+                        ${column3.join('')}
                     </div>
                 </div>
             </div>
