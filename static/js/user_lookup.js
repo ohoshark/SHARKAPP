@@ -473,10 +473,14 @@ function renderUserData(data) {
                 return;
             }
             
+            // wider 프로젝트 여부 확인
+            const isWider = projectShortName.endsWith('-wider');
+            const detailLink = isWider ? '' : `<a href="/kaito/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>`;
+            
             html += `<div class="card project-card kaito-card">
                 <div class="card-body">
                     <span class="project-type-icon kaito"><img src="/static/kaito.png" alt="Kaito" style="width: 70%; height: 70%; object-fit: contain;"></span>
-                    <a href="/kaito/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
+                    ${detailLink}
                     <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
                     <div class="timeframe-container">`;
             
