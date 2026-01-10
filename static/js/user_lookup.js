@@ -347,10 +347,38 @@ function renderUserData(data) {
         `);
     }
     
-    // 5. Leaderboard 개수 (그룹)
-    const kaitoCount = data.kaito_projects ? Object.keys(data.kaito_projects).length : 0;
-    const cookieCount = data.cookie_projects ? Object.keys(data.cookie_projects).length : 0;
-    const wallchainCount = data.wallchain_projects ? Object.keys(data.wallchain_projects).length : 0;
+    // 5. Leaderboard 개수 (그룹) - 실제로 순위가 있는 프로젝트만 계산
+    let kaitoCount = 0;
+    if (data.kaito_projects) {
+        Object.keys(data.kaito_projects).forEach(projectName => {
+            const rankings = sortTimeframes(data.kaito_projects[projectName]);
+            if (rankings.length > 0) {
+                kaitoCount++;
+            }
+        });
+    }
+    
+    let cookieCount = 0;
+    if (data.cookie_projects) {
+        Object.keys(data.cookie_projects).forEach(projectName => {
+            const rankings = sortTimeframes(data.cookie_projects[projectName]);
+            const msRankings = rankings.filter(r => r.msRank && r.ms > 0);
+            const cmsRankings = rankings.filter(r => r.cmsRank && r.cms > 0);
+            // MS 카드와 cMS 카드가 각각 별도로 표시되므로 둘 다 카운트
+            if (msRankings.length > 0) cookieCount++;
+            if (cmsRankings.length > 0) cookieCount++;
+        });
+    }
+    
+    let wallchainCount = 0;
+    if (data.wallchain_projects) {
+        Object.keys(data.wallchain_projects).forEach(projectName => {
+            const rankings = sortTimeframes(data.wallchain_projects[projectName]);
+            if (rankings.length > 0) {
+                wallchainCount++;
+            }
+        });
+    }
     
     if (kaitoCount > 0 || cookieCount > 0 || wallchainCount > 0) {
         let leaderboardItems = [];
