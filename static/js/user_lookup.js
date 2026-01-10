@@ -450,7 +450,13 @@ function renderUserData(data) {
     
     // Kaito 프로젝트 (최우선)
     if (data.kaito_projects && Object.keys(data.kaito_projects).length > 0) {
-        Object.keys(data.kaito_projects).sort().forEach(projectName => {
+        // 일반 프로젝트와 wider 프로젝트 분리 후 정렬
+        const allKaitoProjects = Object.keys(data.kaito_projects);
+        const normalProjects = allKaitoProjects.filter(p => !p.replace('kaito-', '').endsWith('-wider')).sort();
+        const widerProjects = allKaitoProjects.filter(p => p.replace('kaito-', '').endsWith('-wider')).sort();
+        const sortedKaitoProjects = [...normalProjects, ...widerProjects];
+        
+        sortedKaitoProjects.forEach(projectName => {
             const rankings = sortTimeframes(data.kaito_projects[projectName]);
             const projectShortName = projectName.replace('kaito-', '');
             const displayName = projectShortName.toUpperCase();
