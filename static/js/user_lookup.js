@@ -280,36 +280,71 @@ function formatCookieProjectName(projectName, suffix) {
 function renderUserData(data) {
     const user = data.user;
     
-    // 통계 데이터 배열 생성 (우선순위: 팔로워 > 스마트 팔로워 > YAPS > X Score)
+    // 통계 데이터 배열 생성 (그룹화된 형태로)
     const stats = [];
     
-    // 1. 팔로워 (최우선)
+    // 1. 팔로워 (단일 항목)
     if (user.follower) {
-        stats.push(`<div><small class="text-muted d-block">Followers</small><strong>${user.follower.toLocaleString()}</strong></div>`);
+        stats.push(`
+            <div class="stat-group">
+                <small class="text-muted d-block mb-1">Followers</small>
+                <strong class="d-block">${user.follower.toLocaleString()}</strong>
+            </div>
+        `);
     }
     
-    // 2. 스마트 팔로워
-    if (user.kaito_smart_follower) {
-        stats.push(`<div><small class="text-muted d-block"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> Smart Followers</small><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
-    }
-    if (user.cookie_smart_follower) {
-        stats.push(`<div><small class="text-muted d-block">🍪 Smart Followers</small><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
+    // 2. 스마트 팔로워 (그룹)
+    if (user.kaito_smart_follower || user.cookie_smart_follower) {
+        let smartFollowerItems = [];
+        if (user.kaito_smart_follower) {
+            smartFollowerItems.push(`<div class="stat-item"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;"><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
+        }
+        if (user.cookie_smart_follower) {
+            smartFollowerItems.push(`<div class="stat-item">🍪 <strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
+        }
+        
+        stats.push(`
+            <div class="stat-group">
+                <small class="text-muted d-block mb-1">Smart Followers</small>
+                ${smartFollowerItems.join('')}
+            </div>
+        `);
     }
     
-    // 3. YAPS (새로 추가)
+    // 3. YAPS (그룹)
     if (data.yaps) {
-        // YAPS 데이터 중 의미있는 값만 표시
+        let yapsItems = [];
         if (data.yaps.yaps_all !== null && data.yaps.yaps_all !== undefined) {
-            stats.push(`<div><small class="text-muted d-block">🎯 YAPS (All)</small><strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item">ALL <strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
         }
         if (data.yaps.yaps_l30d !== null && data.yaps.yaps_l30d !== undefined && data.yaps.yaps_l30d > 0) {
-            stats.push(`<div><small class="text-muted d-block">🎯 YAPS (30D)</small><strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item">30D <strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
+        }
+        if (data.yaps.yaps_l7d !== null && data.yaps.yaps_l7d !== undefined && data.yaps.yaps_l7d > 0) {
+            yapsItems.push(`<div class="stat-item">7D <strong>${Math.round(data.yaps.yaps_l7d).toLocaleString()}</strong></div>`);
+        }
+        if (data.yaps.yaps_l24h !== null && data.yaps.yaps_l24h !== undefined && data.yaps.yaps_l24h > 0) {
+            yapsItems.push(`<div class="stat-item">24H <strong>${Math.round(data.yaps.yaps_l24h).toLocaleString()}</strong></div>`);
+        }
+        
+        if (yapsItems.length > 0) {
+            stats.push(`
+                <div class="stat-group">
+                    <small class="text-muted d-block mb-1">YAPS</small>
+                    ${yapsItems.join('')}
+                </div>
+            `);
         }
     }
     
-    // 4. X Score (마지막)
+    // 4. X Score (단일 항목)
     if (user.wal_score) {
-        stats.push(`<div><small class="text-muted d-block">🦆 X SCORE</small><strong>${user.wal_score.toLocaleString()}</strong></div>`);
+        stats.push(`
+            <div class="stat-group">
+                <small class="text-muted d-block mb-1">X SCORE</small>
+                <strong class="d-block">🦆 ${user.wal_score.toLocaleString()}</strong>
+            </div>
+        `);
     }
     
     // Kaito 이미지 ID 감지 (숫자만 있는 경우)

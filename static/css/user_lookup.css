@@ -236,3 +236,40 @@ html.dark-mode .timeframe-label {
     font-size: 0.8rem;
     color: #6c757d;
 }
+/* 통계 그룹 스타일 */
+.stat-group {
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    min-width: 120px;
+}
+
+.stat-group small {
+    font-weight: 600;
+    color: #6c757d;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.9rem;
+}
+
+.stat-item strong {
+    color: #212529;
+}
+
+/* 다크모드 스타일 */
+html.dark-mode .stat-group {
+    background: #2d2d2d;
+}
+
+html.dark-mode .stat-group small {
+    color: #999;
+}
+
+html.dark-mode .stat-item strong {
+    color: #e0e0e0;
+}
