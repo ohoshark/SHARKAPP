@@ -271,6 +271,7 @@ html.dark-mode .user-info-header {
     display: flex;
     gap: 20px;
     flex-wrap: wrap;
+    align-items: stretch;
 }
 
 .stat-group {
@@ -278,10 +279,13 @@ html.dark-mode .user-info-header {
     background: #f8f9fa;
     border-radius: 6px;
     min-width: 140px;
+    display: flex;
+    flex-direction: column;
 }
 
 .stat-group-combined {
     display: flex;
+    flex-direction: row !important;
     gap: 20px;
 }
 
