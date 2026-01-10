@@ -273,18 +273,28 @@ html.dark-mode .user-info-header {
     flex-wrap: wrap;
 }
 
-.stats-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-width: 140px;
-}
-
 .stat-group {
     padding: 8px 12px;
     background: #f8f9fa;
     border-radius: 6px;
     min-width: 140px;
+}
+
+.stat-group-combined {
+    display: flex;
+    gap: 20px;
+}
+
+.stat-subsection {
+    display: flex;
+    flex-direction: column;
+}
+
+.yaps-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    column-gap: 16px;
 }
 
 .stat-group small {
