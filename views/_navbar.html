@@ -195,7 +195,7 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="kaitoProjectModalLabel"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> KAITO 프로젝트 선택 ({{len(kaito_projects)}}개)</h5>
+                <h5 class="modal-title" id="kaitoProjectModalLabel"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> KAITO 프로젝트 선택 ({{len([p for p in kaito_projects if not p.endswith('-wider')])}}개)</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -206,7 +206,7 @@
                 
                 <!-- 프로젝트 목록 -->
                 <div class="row g-2" id="kaitoProjectList">
-                    % for kaito_proj in sorted(kaito_projects):
+                    % for kaito_proj in sorted([p for p in kaito_projects if not p.endswith('-wider')]):
                         <div class="col-md-6 col-lg-4 kaito-project-item" data-project-name="{{kaito_proj.lower()}}">
                             <a href="/kaito/{{kaito_proj}}/leaderboard" class="btn btn-outline-primary w-100 text-start" style="text-transform: uppercase;">
                                 🌐 {{kaito_proj}}
