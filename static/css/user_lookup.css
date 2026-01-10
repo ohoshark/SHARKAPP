@@ -236,7 +236,50 @@ html.dark-mode .timeframe-label {
     font-size: 0.8rem;
     color: #6c757d;
 }
+/* 사용자 정보 헤더 스타일 */
+.user-info-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+html.dark-mode .user-info-header {
+    border-bottom-color: #444;
+}
+
+.user-profile-image {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.user-name-section h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.user-name-section p {
+    font-size: 1rem;
+}
+
 /* 통계 그룹 스타일 */
+.stats-columns {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stats-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 140px;
+}
+
 .stat-group {
     padding: 8px 12px;
     background: #f8f9fa;
