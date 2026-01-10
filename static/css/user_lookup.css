@@ -241,7 +241,7 @@ html.dark-mode .timeframe-label {
     padding: 8px 12px;
     background: #f8f9fa;
     border-radius: 6px;
-    min-width: 120px;
+    min-width: 140px;
 }
 
 .stat-group small {
@@ -252,13 +252,23 @@ html.dark-mode .timeframe-label {
 .stat-item {
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between;
+    gap: 8px;
     margin-top: 4px;
     font-size: 0.9rem;
 }
 
+.stat-item .stat-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
 .stat-item strong {
     color: #212529;
+    text-align: right;
+    flex: 1 1 auto;
 }
 
 /* 다크모드 스타일 */

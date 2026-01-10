@@ -297,10 +297,10 @@ function renderUserData(data) {
     if (user.kaito_smart_follower || user.cookie_smart_follower) {
         let smartFollowerItems = [];
         if (user.kaito_smart_follower) {
-            smartFollowerItems.push(`<div class="stat-item"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;"><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
+            smartFollowerItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito</span><strong>${user.kaito_smart_follower.toLocaleString()}</strong></div>`);
         }
         if (user.cookie_smart_follower) {
-            smartFollowerItems.push(`<div class="stat-item">🍪 <strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
+            smartFollowerItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie</span><strong>${user.cookie_smart_follower.toLocaleString()}</strong></div>`);
         }
         
         stats.push(`
@@ -315,16 +315,16 @@ function renderUserData(data) {
     if (data.yaps) {
         let yapsItems = [];
         if (data.yaps.yaps_all !== null && data.yaps.yaps_all !== undefined) {
-            yapsItems.push(`<div class="stat-item">ALL <strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">ALL</span><strong>${Math.round(data.yaps.yaps_all).toLocaleString()}</strong></div>`);
         }
         if (data.yaps.yaps_l30d !== null && data.yaps.yaps_l30d !== undefined && data.yaps.yaps_l30d > 0) {
-            yapsItems.push(`<div class="stat-item">30D <strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">30D</span><strong>${Math.round(data.yaps.yaps_l30d).toLocaleString()}</strong></div>`);
         }
         if (data.yaps.yaps_l7d !== null && data.yaps.yaps_l7d !== undefined && data.yaps.yaps_l7d > 0) {
-            yapsItems.push(`<div class="stat-item">7D <strong>${Math.round(data.yaps.yaps_l7d).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">7D</span><strong>${Math.round(data.yaps.yaps_l7d).toLocaleString()}</strong></div>`);
         }
         if (data.yaps.yaps_l24h !== null && data.yaps.yaps_l24h !== undefined && data.yaps.yaps_l24h > 0) {
-            yapsItems.push(`<div class="stat-item">24H <strong>${Math.round(data.yaps.yaps_l24h).toLocaleString()}</strong></div>`);
+            yapsItems.push(`<div class="stat-item"><span class="stat-label">24H</span><strong>${Math.round(data.yaps.yaps_l24h).toLocaleString()}</strong></div>`);
         }
         
         if (yapsItems.length > 0) {
@@ -337,12 +337,37 @@ function renderUserData(data) {
         }
     }
     
-    // 4. X Score (단일 항목)
+    // 4. Wallchain (X Score)
     if (user.wal_score) {
         stats.push(`
             <div class="stat-group">
-                <small class="text-muted d-block mb-1">X SCORE</small>
-                <strong class="d-block">🦆 ${user.wal_score.toLocaleString()}</strong>
+                <small class="text-muted d-block mb-1">Wallchain</small>
+                <div class="stat-item"><span class="stat-label">X SCORE</span><strong>${user.wal_score.toLocaleString()}</strong></div>
+            </div>
+        `);
+    }
+    
+    // 5. Leaderboard 개수 (그룹)
+    const kaitoCount = data.kaito_projects ? Object.keys(data.kaito_projects).length : 0;
+    const cookieCount = data.cookie_projects ? Object.keys(data.cookie_projects).length : 0;
+    const wallchainCount = data.wallchain_projects ? Object.keys(data.wallchain_projects).length : 0;
+    
+    if (kaitoCount > 0 || cookieCount > 0 || wallchainCount > 0) {
+        let leaderboardItems = [];
+        if (kaitoCount > 0) {
+            leaderboardItems.push(`<div class="stat-item"><span class="stat-label"><img src="/static/kaito.png" alt="Kaito" style="width: 16px; height: 16px; margin-right: 4px;">Kaito LB</span><strong>${kaitoCount}</strong></div>`);
+        }
+        if (cookieCount > 0) {
+            leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🍪 Cookie LB</span><strong>${cookieCount}</strong></div>`);
+        }
+        if (wallchainCount > 0) {
+            leaderboardItems.push(`<div class="stat-item"><span class="stat-label">🦆 Wallchain LB</span><strong>${wallchainCount}</strong></div>`);
+        }
+        
+        stats.push(`
+            <div class="stat-group">
+                <small class="text-muted d-block mb-1">Leaderboards</small>
+                ${leaderboardItems.join('')}
             </div>
         `);
     }
