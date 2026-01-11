@@ -13,7 +13,13 @@
                         current_lang = current_parts[1].lower() if len(current_parts) > 1 else ''
                         current_flag = flags.get(current_lang, '')
                     %>
-                    {{current_flag}} {{current_name}}
+                    <img 
+                        src="/icon/{{current_name.lower()}}" 
+                        alt="{{current_name.lower()}}" 
+                        style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover;"
+                        onerror="this.onerror=null;this.src='/static/default.png';"
+                    >
+                     {{current_name}} {{current_flag}}
                 </button>
                 <ul class="dropdown-menu shadow border-0" style="padding: 5px; background-color: rgba(255,255,255,0.6); backdrop-filter: blur(6px); margin-left: -50px;" aria-labelledby="projectDropdown">
                     
