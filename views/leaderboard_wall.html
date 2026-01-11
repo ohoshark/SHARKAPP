@@ -142,7 +142,7 @@
     <div class="container mt-4">
         <div class="card timestamp-selector">
             <div class="card-header">
-                <h5><b>🦆{{display_project_name.upper().replace('WALLCHAIN: ', '')}}</b> {{t['title_suffix']}}</h5>
+                <h3><img src="/icon/{{project.lower()}}" alt="project" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover;"><b> {{display_project_name.upper().replace('WALLCHAIN: ', '')}}</b> {{t['title_suffix']}}</h3>
             </div>
 			<div class="card-body">
 				<form id="comparisonForm" method="get" action="/wallchain/{{project}}/leaderboard">

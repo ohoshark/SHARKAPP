@@ -148,7 +148,7 @@
         
         <div class="card timestamp-selector">
             <div class="card-header">
-                <h3 class="mb-0">{{display_project_name.upper()}} {{t['title_suffix']}}</h3>
+                <h3 class="mb-0"><img src="/icon/{{current_project.rsplit('-', 1)[0].lower()}}" alt="{{current_project.rsplit('-', 1)[0].lower()}}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"> {{current_project.rsplit('-', 1)[0].upper()}}{{display_project_name[:2]}} {{t['title_suffix']}}</h3>
             </div>
 				<div class="card-body">
 					<form method="get" action="/cookie/{{project}}/leaderboard" id="comparisonForm">
@@ -338,7 +338,7 @@
 			noUiSlider.create(slider, {
 				start: [start1, start2], 
 				connect: true,
-				step: 0.1, 
+				step: 0.01, 
 				range: {
 					'min': 0,
 					'max': 100
