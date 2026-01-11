@@ -231,8 +231,8 @@ function sortTimeframes(rankings) {
     };
     
     return rankings.sort((a, b) => {
-        const tfA = a.timeframe;
-        const tfB = b.timeframe;
+        const tfA = a.timeframe.toUpperCase();
+        const tfB = b.timeframe.toUpperCase();
         
         // 알려진 순서가 있으면 사용
         const aOrder = knownOrder[tfA];
@@ -260,7 +260,24 @@ function sortTimeframes(rankings) {
     });
 }
 
-// Cookie 프로젝트명 포맷 함수 (언어 플래그 추가 및 언어 코드 제거)
+// Cookie 프로젝트명 포맷 함수 (언어 플래그 반환)
+function formatCookieProjectFlag(projectName, suffix) {
+    const flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'};
+    const upperName = projectName.toUpperCase();
+    
+    // 언어 코드 패턴 확인
+    const langMatch = upperName.match(/-(EN|KO|PT|ES|ZH)$/);
+    if (langMatch) {
+        const lang = langMatch[1].toLowerCase();
+        const baseName = upperName.substring(0, upperName.length - 3); // -XX 제거
+        const flag = flags[lang] || '🌐';
+        return `${flag}`        
+        // return `<span class="flag-emoji">${flag}</span><span>${baseName} ${suffix}</span>`;
+    }
+    return `${flag}`
+    // return `<span>${upperName} ${suffix}</span>`;
+}
+// Cookie 프로젝트명 포맷 함수 (프로젝트명 반환)
 function formatCookieProjectName(projectName, suffix) {
     const flags = {'ko': '🇰🇷', 'en': '🌐', 'zh': '🇨🇳', 'pt': '🇵🇹', 'es': '🇪🇸'};
     const upperName = projectName.toUpperCase();
@@ -271,10 +288,13 @@ function formatCookieProjectName(projectName, suffix) {
         const lang = langMatch[1].toLowerCase();
         const baseName = upperName.substring(0, upperName.length - 3); // -XX 제거
         const flag = flags[lang] || '🌐';
-        return `<span class="flag-emoji">${flag}</span><span>${baseName} ${suffix}</span>`;
+        return `${baseName}`;        
+        // return `<span class="flag-emoji">${flag}</span><span>${baseName} ${suffix}</span>`;
     }
-    return `<span>${upperName} ${suffix}</span>`;
+    return `${baseName}`;  
+    // return `<span>${upperName} ${suffix}</span>`;
 }
+
 
 // 사용자 데이터 렌더링
 function renderUserData(data) {
@@ -439,7 +459,14 @@ function renderUserData(data) {
                 <div class="card-body">
                     <span class="project-type-icon kaito"><img src="/static/kaito.png" alt="Kaito" style="width: 70%; height: 70%; object-fit: contain;"></span>
                     ${detailLink}
-                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
+                    <h5 class="card-title"><span class="flag-emoji">
+                                        <img 
+                                            src="/icon/${displayName.toLowerCase().replace(/-wider$/, '')}" 
+                                            alt="${displayName.toLowerCase().replace(/-wider$/, '')}" 
+                                            style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                                            onerror="this.onerror=null;this.src='/static/default.png';"
+                                        >
+                    </span><span>${displayName}</span></h5>
                     <div class="timeframe-container">`;
             
             rankings.forEach(r => {
@@ -470,11 +497,21 @@ function renderUserData(data) {
             // 마쉐 카드
             if (msRankings.length > 0) {
                 const displayName = formatCookieProjectName(projectName, '(MS)');
+                const displayFlag = formatCookieProjectFlag(projectName, '(MS)');
                 html += `<div class="card project-card">
                     <div class="card-body">
                         <span class="project-type-icon">🍪</span>
                         <a href="/cookie/${projectName}/user/${user.infoName}?metric=snapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
-                        <h5 class="card-title">${displayName}</h5>
+                        <h5 class="card-title">
+                            <span class="flag-emoji">
+                                            <img 
+                                                src="/icon/${displayName.toLowerCase()}" 
+                                                alt="${displayName.toLowerCase()}" 
+                                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                                                onerror="this.onerror=null;this.src='/static/default.png';"
+                                            >
+                            </span>
+                        ${displayName.toUpperCase()}(MS)${displayFlag}</h5>
                         <div class="timeframe-container">`;
                 
                 msRankings.forEach(r => {
@@ -491,11 +528,21 @@ function renderUserData(data) {
             // c마쉐 카드 (별도 카드)
             if (cmsRankings.length > 0) {
                 const displayName = formatCookieProjectName(projectName, '(cMS)');
+                const displayFlag = formatCookieProjectFlag(projectName, '(cMS)');
                 html += `<div class="card project-card">
                     <div class="card-body">
                         <span class="project-type-icon">🍪</span>
                         <a href="/cookie/${projectName}/user/${user.infoName}?metric=cSnapsPercent" class="user-detail-link" title="유저 상세 분석">🔍</a>
-                        <h5 class="card-title">${displayName}</h5>
+                        <h5 class="card-title">
+                            <span class="flag-emoji">
+                                            <img 
+                                                src="/icon/${displayName.toLowerCase()}" 
+                                                alt="${displayName.toLowerCase()}" 
+                                                style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                                                onerror="this.onerror=null;this.src='/static/default.png';"
+                                            >
+                            </span>
+                        ${displayName.toUpperCase()}(cMS)${displayFlag}</h5>
                         <div class="timeframe-container">`;
                 
                 cmsRankings.forEach(r => {
@@ -527,14 +574,22 @@ function renderUserData(data) {
                 <div class="card-body">
                     <span class="project-type-icon wallchain">🦆</span>
                     <a href="/wallchain/${projectShortName}/user/${user.infoName}" class="user-detail-link" title="유저 상세 분석">🔍</a>
-                    <h5 class="card-title"><span class="flag-emoji">🌐</span><span>${displayName}</span></h5>
+                    <h5 class="card-title"><span class="flag-emoji">
+                        <img 
+                            src="/icon/${displayName.toLowerCase()}" 
+                            alt="${displayName.toLowerCase()}" 
+                            style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;"
+                            onerror="this.onerror=null;this.src='/static/default.png';"
+                        >
+                    </span><span>${displayName}</span></h5>
                     <div class="timeframe-container">`;
             
             rankings.forEach(r => {
                 const changeIcon = r.positionChange > 0 ? '↑' : r.positionChange < 0 ? '↓' : '';
                 const changeColor = r.positionChange > 0 ? 'success' : r.positionChange < 0 ? 'danger' : 'secondary';
-                const displayTimeframe = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2').replace('epoch-1', 'epoch1');
-                
+                const tf = r.timeframe.replace('epoch-2', 'epoch2').replace('epoch_2', 'epoch2').replace('epoch-1', 'epoch1');
+                const displayTimeframe = tf.toLowerCase().startsWith('epoch') ? tf : tf.toUpperCase();
+
                 let changeDisplay = '';
                 if (r.positionChange === 'new')
                     changeDisplay = `<span class="position-change text-success">NEW</span>`;
