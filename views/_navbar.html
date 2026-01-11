@@ -21,7 +21,7 @@
                     % if kaito_projects:
                         <li>
                             <a class="dropdown-header text-warning fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#kaitoProjectModal" onclick="event.stopPropagation();">
-                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> Kaito<i class="fas fa-chevron-right" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;color:#0fa9cf;"><img src="/static/kaito.png" alt="Kaito" style="width: 20px; height: 20px;"> Kaito<i class="fas fa-chevron-right" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                     % end
@@ -33,7 +33,7 @@
                         % end
                         <li>
                             <a class="dropdown-header text-info fw-bold d-flex justify-content-between align-items-center project-header" style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#wallchainProjectsCollapse" aria-expanded="false" onclick="event.stopPropagation();">
-                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
+                                <span class="project-header-bg" style="display:inline-flex;align-items:center;gap:0.5rem;width:100%;padding:0.35rem 0.6rem;border-radius:6px;color:#1aa732">🦆 Wallchain<i class="fas fa-chevron-down" style="font-size: 0.8rem;margin-left:auto;"></i></span>
                             </a>
                         </li>
                         <div class="collapse" id="wallchainProjectsCollapse">
@@ -51,7 +51,13 @@
                                 %>
                                 <li>
                                     <a class="dropdown-item" href="/wallchain/{{item['full']}}/leaderboard">
-                                        {{p_flag}} {{proj_name.upper()}}
+                                        <img 
+                                            src="/icon/{{proj_name.lower()}}" 
+                                            alt="{{proj_name.lower()}}" 
+                                            style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;"
+                                            onerror="this.onerror=null;this.src='/static/default.png';"
+                                        >
+                                         {{proj_name.upper()}} {{p_flag}}
                                     </a>
                                 </li>
                             % else:
@@ -69,7 +75,13 @@
                                                 lang_display = lang_names.get(item['lang'].lower(), item['lang'].upper())
                                             %>
                                             <a class="dropdown-item" style="padding-left: 2.5rem;" href="/wallchain/{{item['full']}}/leaderboard">
-                                                {{p_flag}} {{lang_display}}
+                                                <img 
+                                                    src="/icon/{{proj_name.lower()}}" 
+                                                    alt="{{proj_name.lower()}}" 
+                                                    style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;"
+                                                    onerror="this.onerror=null;this.src='/static/default.png';"
+                                                >
+                                                 {{lang_display}}{{p_flag}}
                                             </a>
                                         % end
                                     </div>
@@ -104,13 +116,27 @@
                                 %>
                                 <li>
                                     <a class="dropdown-item" href="/cookie/{{item['full']}}/leaderboard">
-                                        {{p_flag}} {{proj_name.upper()}}
+                                        <img 
+                                            src="/icon/{{proj_name.lower()}}" 
+                                            alt="{{proj_name.lower()}}" 
+                                            style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;"
+                                            onerror="this.onerror=null;this.src='/static/default.png';"
+                                        >
+                                         {{proj_name.upper()}} {{p_flag}}
                                     </a>
                                 </li>
                             % else:
                                 <li>
                                     <a class="dropdown-item d-flex justify-content-between align-items-center" style="font-weight: 600; cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#cookie-{{proj_name}}" aria-expanded="false" onclick="event.stopPropagation();">
-                                        {{proj_name.upper()}}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <img 
+                                                src="/icon/{{proj_name.lower()}}" 
+                                                alt="{{proj_name.lower()}}" 
+                                                style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover;"
+                                                onerror="this.onerror=null;this.src='/static/default.png';"
+                                            >
+                                            <span>{{proj_name.upper()}}</span>
+                                        </div>
                                         <i class="fas fa-chevron-down" style="font-size: 0.8rem;"></i>
                                     </a>
                                     <div class="collapse" id="cookie-{{proj_name}}">
@@ -209,7 +235,13 @@
                     % for kaito_proj in sorted([p for p in kaito_projects if not p.endswith('-wider')]):
                         <div class="col-md-6 col-lg-4 kaito-project-item" data-project-name="{{kaito_proj.lower()}}">
                             <a href="/kaito/{{kaito_proj}}/leaderboard" class="btn btn-outline-primary w-100 text-start" style="text-transform: uppercase;">
-                                🌐 {{kaito_proj}}
+                                <img 
+                                    src="/icon/{{kaito_proj.lower()}}" 
+                                    alt="{{kaito_proj}}" 
+                                    style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;"
+                                    onerror="this.onerror=null;this.src='/static/default.png';"
+                                >
+                                 <span class="text-xl font-bold">{{kaito_proj}}</span>
                             </a>
                         </div>
                     % end
