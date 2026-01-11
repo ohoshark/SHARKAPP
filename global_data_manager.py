@@ -167,7 +167,7 @@ class GlobalDataManager:
             cursor = conn.cursor()
             
             # 유저 기본 정보
-            cursor.execute('SELECT * FROM users WHERE infoName = ?', (info_name,))
+            cursor.execute('SELECT * FROM users WHERE infoName = ? COLLATE NOCASE', (info_name,))
             user_row = cursor.fetchone()
             
             if not user_row:
@@ -187,7 +187,7 @@ class GlobalDataManager:
             cursor.execute('''
                 SELECT projectName, timeframe, msRank, cmsRank, ms, cms, positionChange
                 FROM rankings
-                WHERE infoName = ?
+                WHERE infoName = ? COLLATE NOCASE
                 ORDER BY projectName, timeframe
             ''', (info_name,))
             
