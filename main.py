@@ -631,6 +631,8 @@ def render_error(error_message, project_name=None):
                        json=json)
     except ValueError as e:
         return render_error(str(e), projectname)  # 통일된 에러 렌더링
+
+# ===================== STATIC FILES =====================
                 
 # 프로젝트 하위 경로 처리
 @app.route('/<projectname>/static/<filepath:path>')
@@ -646,6 +648,23 @@ def send_static(filename):
     # 정적 파일 캐시 헤더 (1년) - 브라우저 캐싱
     response.set_header('Cache-Control', 'public, max-age=31536000, immutable')
     return res
+
+@app.route('/icon/<project_name>')
+def serve_icon(project_name):
+    print(f"[아이콘 요청] Kaito 프로젝트: {project_name}")
+    ICON_DIR = "./static/icons/"
+    # 지원하는 확장자 리스트
+    extensions = ['.png', '.jpg', '.svg']
+    
+    for ext in extensions:
+        filename = f"{project_name}{ext}"
+        file_path = os.path.join(ICON_DIR, filename)
+        # 파일이 실제로 존재하면 전송
+        if os.path.exists(file_path):
+            return static_file(filename, root=ICON_DIR)
+    
+    # 맞는 이미지가 없으면 기본 이미지(default.png) 전송 (선택사항)
+    return static_file("default.png", root="./static")
 
 @app.route('/kaito-img/<imageid>')
 def kaito_image_proxy(imageid):
