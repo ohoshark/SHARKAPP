@@ -651,7 +651,7 @@ def send_static(filename):
 
 @app.route('/icon/<project_name>')
 def serve_icon(project_name):
-    print(f"[아이콘 요청] Kaito 프로젝트: {project_name}")
+    # print(f"[아이콘 요청] Kaito 프로젝트: {project_name}")
     ICON_DIR = "./static/icons/"
     # 지원하는 확장자 리스트
     extensions = ['.png', '.jpg', '.svg', '.webp']
@@ -1314,7 +1314,7 @@ def user_lookup_page():
     return template('user_lookup.html',
                    lang=lang,
                    current_page='user_lookup',
-                   project='SEARCH',
+                   project='GLOBAL',
                    all_projects=all_projects,
                    all_wallchain_projects=all_wallchain_projects,
                    grouped_projects=grouped_projects,
