@@ -88,26 +88,28 @@
 
 .project-type-icon {
     position: absolute;
-    top: -15px;
-    left: -15px;
-    width: 48px;
-    height: 48px;
+    top: 0px;
+    left: 0px;
+    width: 32px;
+    height: 32px;
     background: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.2rem;
+    font-size: 1.2rem;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     z-index: 10;
+
+    
 }
 
 .project-type-icon.wallchain {
-    top: -15px;
-    left: -15px;
-    width: 48px;
-    height: 48px;
-    font-size: 2.2rem;
+    top: 0px;
+    left: 0px;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
 }
 
 .user-detail-link:hover {
@@ -174,10 +176,10 @@ html.dark-mode .user-detail-link {
 }
 
 .project-type-icon.kaito {
-    top: -15px;
-    left: -15px;
-    width: 48px;
-    height: 48px;
+    top: 0px;
+    left: 0px;
+    width: 32px;
+    height: 32px;
     font-size: 2.2rem;
     padding: 3px;
     display: flex;
