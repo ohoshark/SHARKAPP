@@ -1,7 +1,6 @@
 /data
 /__pycache__
-access_log.txt
-unified_rankings.db
+*.txt
 *.db
 /static/kaito
 static/kaito.png
