@@ -556,14 +556,30 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 				const lowerQuery = query.toLowerCase();
 				const foundUsers = [];
 				
+				// 전체 행에서 검색 (페이징 무시하고 모든 데이터 검색)
 				table.rows().every(function() { 
-					const rowData = this.data();
-					const username = $('<div>' + rowData[0] + '</div>').text().trim(); 
+					const rowNode = this.node();
+					const $row = $(rowNode);
+					const rowIndex = this.index();
 					
-					if (username.toLowerCase().includes(lowerQuery)) {
+					// 첫 번째 셀에서 사용자 정보 추출
+					const $userCell = $row.find('td:first');
+					const displayName = $userCell.find('strong').text().trim();
+					const usernameText = $userCell.find('small.text-muted').text().trim();
+					
+					// @ 기호 제거하고 이모지 앞까지 추출
+					let username = usernameText.replace('@', '').trim();
+					const emojiIndex = username.indexOf('🔍');
+					if (emojiIndex !== -1) {
+						username = username.substring(0, emojiIndex).trim();
+					}
+					
+					// displayName 또는 username이 검색어를 포함하는지 확인
+					if (username.toLowerCase().includes(lowerQuery) || displayName.toLowerCase().includes(lowerQuery)) {
 						foundUsers.push({
 							username: username,
-							index: this.index()
+							displayName: displayName,
+							rowIndex: rowIndex
 						});
 					}
 				});
@@ -576,8 +592,9 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 				foundUsers.forEach(function(user) {
 					const $item = $(
 						'<a href="#" class="list-group-item list-group-item-action" ' +
-						'data-username="' + user.username + '">' + 
-						user.username + '</a>'
+						'data-row-index="' + user.rowIndex + '">' + 
+						'<strong>' + user.displayName + '</strong><br>' +
+						'<small class="text-muted">@' + user.username + '</small></a>'
 					);
 					$searchResults.append($item);
 				});
@@ -594,20 +611,9 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 
 			$searchResults.on('click', 'a.list-group-item-action', function(e) {
 				e.preventDefault();
-				const usernameToFind = $(this).data('username');
-				let targetRowIndex = null;
+				const targetRowIndex = parseInt($(this).data('row-index'));
 
-				// 전체 행에서 해당 사용자 찾기
-				table.rows().every(function() {
-					const rowData = this.data();
-					const cellText = $('<div>' + rowData[0] + '</div>').text().trim(); 
-					if (cellText === usernameToFind) {
-						targetRowIndex = this.index();
-						return false; 
-					}
-				});
-
-				if (targetRowIndex !== null) {
+				if (!isNaN(targetRowIndex) && targetRowIndex !== null) {
 					searchModal.hide();
 					
 					setTimeout(function() {
@@ -617,12 +623,23 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 					}, 100);
 					
 					setTimeout(function() {
-						// 해당 행이 있는 페이지로 이동
+						// 현재 정렬 순서에서 해당 행의 실제 위치 찾기
+						const currentOrderIndexes = table.rows({order: 'current'}).indexes().toArray();
+						const displayPosition = currentOrderIndexes.indexOf(targetRowIndex);
+						
+						if (displayPosition === -1) {
+							console.error('Row not found in current order');
+							return;
+						}
+						
+						// 페이지 정보 가져오기
 						const pageInfo = table.page.info();
 						const pageSize = pageInfo.length;
-						const targetPage = Math.floor(targetRowIndex / pageSize);
 						
-						// 페이지 이동 (false = 페이지 번호 리셋 안 함)
+						// 현재 정렬 순서에서의 위치를 기준으로 페이지 계산
+						const targetPage = Math.floor(displayPosition / pageSize);
+						
+						// 페이지 이동
 						table.page(targetPage).draw(false);
 						
 						// 페이지 이동 후 DOM이 업데이트되면 스크롤
@@ -630,6 +647,7 @@ document.getElementById('comparisonForm').addEventListener('submit', function(e)
 							const $targetRow = $(table.row(targetRowIndex).node());
 							
 							if ($targetRow && $targetRow.length) {
+								// 스크롤 이동
 								$('html, body').animate({
 									scrollTop: $targetRow.offset().top - 150 
 								}, 500);
