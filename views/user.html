@@ -128,8 +128,9 @@
                 <div class="row g-3">
                     <div class="col-12 col-lg-auto d-flex align-items-center">
                         <select class="form-select" id="metric" name="metric" onchange="document.getElementById('analysisOptionsForm').submit()">
-                            <option value="snapsPercent" {{ 'selected' if metric == 'snapsPercent' else '' }}>Mindshare</option>
-                            <option value="cSnapsPercent" {{ 'selected' if metric == 'cSnapsPercent' else '' }}>cMindshare</option>
+                            % for m in available_metrics:
+                                <option value="{{ m['value'] }}" {{ 'selected' if metric == m['value'] else '' }}>{{ m['label'] }}</option>
+                            % end
                         </select>
                     </div>
                 </div>

@@ -112,6 +112,16 @@ class DataProcessor:
                                 snap['timestamp'] = timestamp
                                 all_records.append(snap)
                             
+                            # cSnaps 배열도 처리 (중복 username 제거)
+                            csnaps = raw_data['result']['data']['json'].get('cSnaps', [])
+                            existing_usernames = {snap.get('username') for snap in all_records}
+                            for snap in csnaps:
+                                if snap.get('username') not in existing_usernames:
+                                    snap['timeframe'] = timeframe
+                                    snap['timestamp'] = timestamp
+                                    all_records.append(snap)
+                                    existing_usernames.add(snap.get('username'))
+                            
                             # 최신 파일 정보 갱신
                             self.latest_file[timeframe] = filename
                             self._save_latest_file_info(timeframe, filename)

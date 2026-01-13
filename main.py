@@ -73,6 +73,52 @@ COOKIE_INITIAL_LOAD_DONE = threading.Event()
 WALLCHAIN_INITIAL_LOAD_DONE = threading.Event()
 KAITO_INITIAL_LOAD_DONE = threading.Event()
 
+# Cookie 필터링 설정
+COOKIE_CONFIG = {}
+
+def load_cookie_config():
+    """cookie_config.json 로드"""
+    global COOKIE_CONFIG
+    try:
+        with open('cookie_config.json', 'r', encoding='utf-8') as f:
+            COOKIE_CONFIG = json.load(f)
+        print("[Cookie Config] Loaded successfully")
+        print(f"  - snaps_reward_langs: {COOKIE_CONFIG.get('snaps_reward_langs', {})}")
+        print(f"  - csnaps_reward_langs: {COOKIE_CONFIG.get('csnaps_reward_langs', {})}")
+    except Exception as e:
+        print(f"[Cookie Config] Failed to load: {e}")
+        COOKIE_CONFIG = {
+            "snaps_reward_langs": {},
+            "csnaps_reward_langs": {},
+            "default_snaps_exclude": [],
+            "default_csnaps_exclude": []
+        }
+
+def should_exclude_lang(project_name, lang, metric):
+    """
+    특정 프로젝트의 특정 언어를 제외해야 하는지 판단
+    
+    Args:
+        project_name: 프로젝트 이름 (예: 'superform')
+        lang: 언어 코드 (예: 'ko', 'zh')
+        metric: metric 타입 ('snapsPercent', 'cSnapsPercent', 'cSnaps' 등)
+    
+    Returns:
+        bool: 제외해야 하면 True
+    """
+    if not lang:
+        return False
+    
+    # metric에 따라 어떤 config를 확인할지 결정
+    if metric in ['snapsPercent', 'snaps']:
+        exclude_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(project_name, [])
+    elif metric in ['cSnapsPercent', 'cSnaps']:
+        exclude_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(project_name, [])
+    else:
+        return False
+    
+    return lang in exclude_langs
+
 def flush_logs():
     """버퍼에 쌓인 로그를 파일에 쓰기"""
     global LOG_LAST_FLUSH
@@ -1559,6 +1605,34 @@ def project_leaderboard(projectname):
         if timestamp1 and timestamp2:
             # ⭐ 수정: metric 파라미터 전달 ⭐
             compare_data = dp.compare_leaderboards(timestamp1, timestamp2, timeframe, metric)
+            
+            # 🔥 en 폴더인 경우 언어 필터링 적용
+            if not compare_data.empty and '-en' in projectname:
+                # projectname에서 실제 프로젝트 이름 추출 (예: 'superform-en' -> 'superform')
+                base_project_name = projectname.replace('-en', '')
+                
+                # primaryLanguage 컬럼이 있는지 확인 (없으면 DB에서 다시 조회 필요)
+                if 'primaryLanguage' not in compare_data.columns:
+                    # username 기준으로 primaryLanguage 조회
+                    with sqlite3.connect(dp.db_path) as conn:
+                        usernames = compare_data['username'].tolist()
+                        placeholders = ','.join(['?'] * len(usernames))
+                        query = f"SELECT DISTINCT username, primaryLanguage FROM snaps WHERE username IN ({placeholders})"
+                        lang_df = pd.read_sql(query, conn, params=usernames)
+                        compare_data = compare_data.merge(lang_df, on='username', how='left')
+                
+                # 필터링: 제외해야 할 언어 제거
+                if 'primaryLanguage' in compare_data.columns:
+                    original_count = len(compare_data)
+                    compare_data = compare_data[
+                        ~compare_data['primaryLanguage'].apply(
+                            lambda lang: should_exclude_lang(base_project_name, lang, metric)
+                        )
+                    ]
+                    filtered_count = original_count - len(compare_data)
+                    # if filtered_count > 0:
+                        # print(f"[Filter] {projectname} {metric}: {filtered_count} users excluded")
+        
         # 데이터 테이블을 HTML로 변환
         if not compare_data.empty:
             # 변화량에 화살표 추가하고 스타일 적용
@@ -1687,6 +1761,37 @@ def project_leaderboard(projectname):
 
         display_project_name = get_flag(dp.lang) +" " + display_project_name
         
+        # 🔥 사용 가능한 metric 목록 계산 (언어별 필터링 적용)
+        available_metrics = []
+        base_project_name = projectname.replace(f'-{dp.lang}', '')
+        
+        # -en 프로젝트는 모든 metric 표시
+        if projectname.endswith('-en'):
+            available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+            available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+        else:
+            # 언어별 프로젝트: 해당 언어가 리워드를 받는 metric만 표시
+            lang = dp.lang
+            
+            # snaps_reward_langs에 있으면 snaps 표시
+            snaps_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(base_project_name, [])
+            if lang in snaps_langs:
+                available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+            
+            # csnaps_reward_langs에 있으면 csnaps 표시
+            csnaps_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(base_project_name, [])
+            if lang in csnaps_langs:
+                available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+            
+            # 아무것도 없으면 모든 metric 표시 (기본값)
+            if not available_metrics:
+                available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+                available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+        
+        # 현재 선택된 metric이 사용 불가능한 경우 첫 번째 사용 가능한 metric으로 변경
+        if available_metrics and metric not in [m['value'] for m in available_metrics]:
+            return redirect(f'/cookie/{projectname}/leaderboard?timeframe={timeframe}&metric={available_metrics[0]["value"]}', code=302)
+        
         return template('leaderboard.html', 
                        project=projectname,
                        lang=lang,
@@ -1709,6 +1814,7 @@ def project_leaderboard(projectname):
                        timestamp2=timestamp2,
                        timestamp1_display=timestamp1_display,
                        timestamp2_display=timestamp2_display,
+                       available_metrics=available_metrics,
                        table_html=table_html)
     except ValueError as e:
         return render_error(str(e), projectname)
@@ -1734,6 +1840,61 @@ def project_user_analysis(projectname,username):
         
         # URL 쿼리 파라미터에서 metric 가져오기
         metric = request.query.get('metric', 'snapsPercent')
+        base_project_name = projectname.replace(f'-{dp.lang}', '')
+        
+        # 🔥 사용 가능한 metric 목록 계산
+        available_metrics = []
+        
+        if projectname.endswith('-en'):
+            # -en 프로젝트: 사용자의 primaryLanguage 확인하여 필터링
+            with sqlite3.connect(dp.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT primaryLanguage FROM snaps WHERE username = ? LIMIT 1", (username,))
+                result = cursor.fetchone()
+                user_lang = result[0] if result else None
+            
+            if user_lang:
+                # snaps 체크: user_lang이 snaps_reward_langs에 없으면 표시
+                snaps_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(base_project_name, [])
+                if user_lang not in snaps_langs:
+                    available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+                
+                # csnaps 체크: user_lang이 csnaps_reward_langs에 없으면 표시
+                csnaps_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(base_project_name, [])
+                if user_lang not in csnaps_langs:
+                    available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+            else:
+                # primaryLanguage 없으면 모든 metric 표시
+                available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+                available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+            
+            # 사용 가능한 metric이 없으면 404
+            if not available_metrics:
+                # print(f"[Filter] User {username} (lang: {user_lang}) excluded from all metrics in {projectname}")
+                return render_error("이 사용자는 해당 프로젝트의 글로벌 리더보드에 표시되지 않습니다.", projectname)
+        else:
+            # 언어별 프로젝트: 해당 언어가 리워드를 받는 metric만 표시
+            lang = dp.lang
+            
+            # snaps_reward_langs에 있으면 snaps 표시
+            snaps_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(base_project_name, [])
+            if lang in snaps_langs:
+                available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+            
+            # csnaps_reward_langs에 있으면 csnaps 표시
+            csnaps_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(base_project_name, [])
+            if lang in csnaps_langs:
+                available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+            
+            # 아무것도 없으면 모든 metric 표시 (기본값)
+            if not available_metrics:
+                available_metrics.append({'value': 'snapsPercent', 'label': 'Mindshare'})
+                available_metrics.append({'value': 'cSnapsPercent', 'label': 'cMindshare'})
+        
+        # 현재 선택된 metric이 사용 불가능한 경우 첫 번째 사용 가능한 metric으로 변경
+        if available_metrics and metric not in [m['value'] for m in available_metrics]:
+            return redirect(f"/cookie/{projectname}/user/{username}?metric={available_metrics[0]['value']}", code=302)
+        
         timeframe = 'total'
         user_info_by_timeframe = {}
         for tf in dp.timeframes:
@@ -1963,6 +2124,7 @@ def project_user_analysis(projectname,username):
                        user_info_by_timeframe=user_info_by_timeframe,
                        rank_col=rank_col,
                        mindshare_col = mindshare_col,
+                       available_metrics=available_metrics,
                        json=json)
     except ValueError as e:
         return render_error(str(e), projectname)
@@ -3106,6 +3268,9 @@ if __name__ == '__main__':
     print("\n" + "="*60)
     print("🦈 SHARKAPP 서버 시작 중...")
     print("="*60)
+    
+    # Cookie 설정 로드
+    load_cookie_config()
     
     # 1. 백그라운드 스레드에서 Cookie 프로젝트 초기화
     init_thread = threading.Thread(target=init_projects_on_startup, daemon=True)
