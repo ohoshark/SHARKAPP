@@ -80,7 +80,7 @@ def load_cookie_config():
     """cookie_config.json 로드"""
     global COOKIE_CONFIG
     try:
-        with open('cookie_config.json', 'r', encoding='utf-8') as f:
+        with open('./data/cookie/cookie_config.json', 'r', encoding='utf-8') as f:
             COOKIE_CONFIG = json.load(f)
         print("[Cookie Config] Loaded successfully")
         print(f"  - snaps_reward_langs: {COOKIE_CONFIG.get('snaps_reward_langs', {})}")
@@ -1458,6 +1458,77 @@ def api_user_data(username):
         
         if not data:
             return json.dumps({'error': 'User not found'}, ensure_ascii=False)
+        
+        # 🔥 Cookie 프로젝트 필터링 적용
+        if 'cookie_projects' in data and data['cookie_projects']:
+            # 1단계: 사용자의 언어별 프로젝트 참여 정보 수집
+            user_lang_projects = {}  # {base_project: [languages]}
+            
+            for project_full_name in data['cookie_projects'].keys():
+                if '-' in project_full_name:
+                    parts = project_full_name.rsplit('-', 1)
+                    base_project_name = parts[0]
+                    project_lang = parts[1]
+                    
+                    # en이 아닌 언어별 프로젝트만 기록
+                    if project_lang != 'en':
+                        if base_project_name not in user_lang_projects:
+                            user_lang_projects[base_project_name] = []
+                        user_lang_projects[base_project_name].append(project_lang)
+            
+            # 2단계: 필터링 적용
+            filtered_cookie_projects = {}
+            
+            for project_full_name, rankings in data['cookie_projects'].items():
+                # 프로젝트 이름과 언어 분리
+                if '-' in project_full_name:
+                    parts = project_full_name.rsplit('-', 1)
+                    base_project_name = parts[0]
+                    project_lang = parts[1]
+                else:
+                    # 언어 없는 프로젝트는 그대로 유지
+                    filtered_cookie_projects[project_full_name] = rankings
+                    continue
+                
+                # snaps_reward_langs와 csnaps_reward_langs 확인
+                snaps_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(base_project_name, [])
+                csnaps_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(base_project_name, [])
+                
+                # 각 ranking 데이터 필터링
+                filtered_rankings = []
+                for ranking in rankings:
+                    filtered_ranking = ranking.copy()
+                    
+                    # -en 프로젝트인 경우
+                    if project_lang == 'en':
+                        # 사용자의 언어별 프로젝트 참여 정보로 언어 파악
+                        user_langs = user_lang_projects.get(base_project_name, [])
+                        
+                        for user_lang in user_langs:
+                            # 사용자 언어가 snaps_reward_langs에 있으면 MS 숨기기 (CMS만 표시)
+                            if user_lang in snaps_langs:
+                                filtered_ranking['ms'] = None
+                                filtered_ranking['msRank'] = None
+                            # 사용자 언어가 csnaps_reward_langs에 있으면 CMS 숨기기 (MS만 표시)
+                            elif user_lang in csnaps_langs:
+                                filtered_ranking['cms'] = None
+                                filtered_ranking['cmsRank'] = None
+                    else:
+                        # 언어별 프로젝트 (예: superform-ko, spaace-ko)
+                        # 해당 언어가 snaps_reward_langs에 있으면 ms만 보여주기 (cms 숨기기)
+                        if project_lang in snaps_langs:
+                            filtered_ranking['cms'] = None
+                            filtered_ranking['cmsRank'] = None
+                        # 해당 언어가 csnaps_reward_langs에 있으면 cms만 보여주기 (ms 숨기기)
+                        elif project_lang in csnaps_langs:
+                            filtered_ranking['ms'] = None
+                            filtered_ranking['msRank'] = None
+                    
+                    filtered_rankings.append(filtered_ranking)
+                
+                filtered_cookie_projects[project_full_name] = filtered_rankings
+            
+            data['cookie_projects'] = filtered_cookie_projects
         
         return json.dumps(data, ensure_ascii=False)
     except Exception as e:
