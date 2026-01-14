@@ -3455,7 +3455,7 @@ if __name__ == '__main__':
               threads=optimal_threads,
               channel_timeout=60,  # 요청 타임아웃 60초
               cleanup_interval=10,  # 연결 정리 주기
-              asyncore_use_poll=True)  # epoll 사용 (Linux에서 성능 향상)
+              channel_request_lookahead=10)  # 큐 깊이 경고 임계값 증가 (기본값: 4)
     except KeyboardInterrupt:
         print("\n[시스템] KeyboardInterrupt 감지")
         SHUTDOWN_FLAG.set()
