@@ -245,25 +245,12 @@ class GlobalDataManager:
             conn.commit()
     
     def begin_batch_update(self):
-        """배치 업데이트 시작 - 임시 테이블 생성"""
+        """배치 업데이트 시작 - rankings 임시 테이블만 생성 (users는 직접 UPSERT)"""
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
-            # 임시 테이블 생성 (기존 테이블과 동일 구조)
-            cursor.execute('DROP TABLE IF EXISTS users_temp')
+            # rankings 임시 테이블만 생성
             cursor.execute('DROP TABLE IF EXISTS rankings_temp')
-            
-            cursor.execute('''
-                CREATE TABLE users_temp (
-                    infoName TEXT PRIMARY KEY,
-                    displayName TEXT,
-                    imageUrl TEXT,
-                    wal_score INTEGER,
-                    cookie_smart_follower INTEGER,
-                    kaito_smart_follower INTEGER,
-                    follower INTEGER
-                )
-            ''')
             
             cursor.execute('''
                 CREATE TABLE rankings_temp (
@@ -283,14 +270,38 @@ class GlobalDataManager:
             conn.commit()
     
     def batch_insert_users(self, users_data):
-        """유저 데이터 배치 삽입"""
+        """유저 데이터 배치 삽입 (최초 생성 시 빠른 INSERT, 이후 UPSERT)"""
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
-            cursor.executemany('''
-                INSERT OR REPLACE INTO users_temp (infoName, displayName, imageUrl, wal_score,
-                                                  cookie_smart_follower, kaito_smart_follower, follower)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', users_data)
+            
+            # DB가 비어있는지 확인 (최초 생성 여부)
+            cursor.execute('SELECT COUNT(*) FROM users')
+            user_count = cursor.fetchone()[0]
+            
+            if user_count == 0:
+                # 최초 생성: 빠른 INSERT만 사용
+                print(f"[GlobalDataManager] 최초 생성 모드 - 빠른 INSERT 사용 ({len(users_data)}명)")
+                cursor.executemany('''
+                    INSERT INTO users (infoName, displayName, imageUrl, wal_score,
+                                      cookie_smart_follower, kaito_smart_follower, follower)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', users_data)
+            else:
+                # 업데이트 모드: UPSERT 사용 (NULL이 아닌 값만 업데이트)
+                print(f"[GlobalDataManager] 업데이트 모드 - UPSERT 사용 ({len(users_data)}명)")
+                cursor.executemany('''
+                    INSERT INTO users (infoName, displayName, imageUrl, wal_score,
+                                      cookie_smart_follower, kaito_smart_follower, follower)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(infoName) DO UPDATE SET
+                        displayName = COALESCE(excluded.displayName, users.displayName),
+                        imageUrl = COALESCE(excluded.imageUrl, users.imageUrl),
+                        wal_score = COALESCE(excluded.wal_score, users.wal_score),
+                        cookie_smart_follower = COALESCE(excluded.cookie_smart_follower, users.cookie_smart_follower),
+                        kaito_smart_follower = COALESCE(excluded.kaito_smart_follower, users.kaito_smart_follower),
+                        follower = COALESCE(excluded.follower, users.follower)
+                ''', users_data)
+            
             conn.commit()
     
     def batch_insert_rankings(self, rankings_data):
@@ -305,7 +316,7 @@ class GlobalDataManager:
             conn.commit()
     
     def commit_batch_update(self):
-        """배치 업데이트 완료 - 임시 테이블을 실제 테이블로 교체 (원자적)"""
+        """배치 업데이트 완료 - rankings만 임시 테이블로 교체 (users는 이미 UPSERT 완료)"""
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
@@ -313,41 +324,31 @@ class GlobalDataManager:
             cursor.execute('BEGIN IMMEDIATE')
             try:
                 # 기존 old 테이블 삭제 (이전 실패 시 남아있을 수 있음)
-                cursor.execute('DROP TABLE IF EXISTS users_old')
                 cursor.execute('DROP TABLE IF EXISTS rankings_old')
                 
-                # 현재 테이블이 존재하는지 확인
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-                users_exists = cursor.fetchone() is not None
-                
+                # 현재 rankings 테이블이 존재하는지 확인
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rankings'")
                 rankings_exists = cursor.fetchone() is not None
                 
                 # 현재 테이블이 있으면 old로 변경, 없으면 스킵
-                if users_exists:
-                    cursor.execute('ALTER TABLE users RENAME TO users_old')
                 if rankings_exists:
                     cursor.execute('ALTER TABLE rankings RENAME TO rankings_old')
                 
                 # 임시 테이블을 실제 테이블로 변경
-                cursor.execute('ALTER TABLE users_temp RENAME TO users')
                 cursor.execute('ALTER TABLE rankings_temp RENAME TO rankings')
                 
-                # 인덱스 재생성
+                # 인덱스 재생성 (rankings만)
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_rankings_infoName ON rankings(infoName)')
-                cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_displayName ON users(displayName)')
                 
                 # old 테이블 삭제 (있는 경우에만)
-                if users_exists:
-                    cursor.execute('DROP TABLE users_old')
                 if rankings_exists:
                     cursor.execute('DROP TABLE rankings_old')
                 
                 conn.commit()
                 # WAL 체크포인트 실행 - 변경사항을 메인 DB에 즉시 반영
                 cursor.execute('PRAGMA wal_checkpoint(PASSIVE)')
-                print("[UnifiedDataManager] 배치 업데이트 완료 - 테이블 교체 성공")
+                print("[GlobalDataManager] 배치 업데이트 완료 - rankings 교체 성공, users UPSERT 완료")
             except Exception as e:
                 conn.rollback()
-                print(f"[UnifiedDataManager] 배치 업데이트 실패: {e}")
+                print(f"[GlobalDataManager] 배치 업데이트 실패: {e}")
                 raise
