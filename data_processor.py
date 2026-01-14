@@ -114,13 +114,14 @@ class DataProcessor:
                             
                             # cSnaps 배열도 처리 (중복 username 제거)
                             csnaps = raw_data['result']['data']['json'].get('cSnaps', [])
-                            existing_usernames = {snap.get('username') for snap in all_records}
-                            for snap in csnaps:
-                                if snap.get('username') not in existing_usernames:
-                                    snap['timeframe'] = timeframe
-                                    snap['timestamp'] = timestamp
-                                    all_records.append(snap)
-                                    existing_usernames.add(snap.get('username'))
+                            if csnaps:  # cSnaps가 존재하고 비어있지 않을 때만 처리
+                                existing_usernames = {snap.get('username') for snap in all_records}
+                                for snap in csnaps:
+                                    if snap.get('username') not in existing_usernames:
+                                        snap['timeframe'] = timeframe
+                                        snap['timestamp'] = timestamp
+                                        all_records.append(snap)
+                                        existing_usernames.add(snap.get('username'))
                             
                             # 최신 파일 정보 갱신
                             self.latest_file[timeframe] = filename
@@ -136,21 +137,26 @@ class DataProcessor:
                     if 'smartFollowersDetails' in df.columns:
                         df = df.drop('smartFollowersDetails', axis=1)
                     
-                    # 복합 객체(list, dict)를 JSON 문자열로 변환 (추가된 로직)
-                    for col in df.columns:
-                        if df[col].apply(lambda x: isinstance(x, (list, dict))).any():
-                            df[col] = df[col].apply(lambda x: orjson.dumps(x).decode('utf-8') if x is not None else None)
+                    # 복합 객체(list, dict)를 JSON 문자열로 변환 (최적화된 로직)
+                    # 첫 번째 행만 체크하여 컬럼별 타입 파악 (전체 apply 방지)
+                    if not df.empty:
+                        for col in df.columns:
+                            first_value = df[col].iloc[0] if len(df) > 0 else None
+                            if isinstance(first_value, (list, dict)):
+                                df[col] = df[col].apply(lambda x: orjson.dumps(x).decode('utf-8') if isinstance(x, (list, dict)) else x)
 
-                    # DB 스키마 자동 업데이트
+                    # DB 스키마 자동 업데이트 (한 번만 체크)
                     cursor = conn.cursor()
                     cursor.execute("PRAGMA table_info(snaps)")
-                    existing_columns = [info[1] for info in cursor.fetchall()]
-                    for col in df.columns:
-                        if col not in existing_columns:
-                            cursor.execute(f"ALTER TABLE snaps ADD COLUMN {col} TEXT")
+                    existing_columns = {info[1] for info in cursor.fetchall()}
+                    new_columns = [col for col in df.columns if col not in existing_columns]
                     
-                    df.to_sql('snaps', conn, if_exists='append', index=False)
-                    print(f"[{timeframe}] DB Insert Complete.")
+                    for col in new_columns:
+                        cursor.execute(f"ALTER TABLE snaps ADD COLUMN '{col}' TEXT")
+                    
+                    # 배치 삽입 (method='multi'로 성능 향상)
+                    df.to_sql('snaps', conn, if_exists='append', index=False, method='multi', chunksize=1000)
+                    print(f"[{timeframe}] DB Insert Complete: {len(df)} rows")
 
         # 🚨 데이터 삽입이 완전히 끝난 후 파일 정리 실행
         if new_data_found:
@@ -216,9 +222,9 @@ class DataProcessor:
 
     def get_leaderboard_at_timestamp(self, timestamp, timeframe='TOTAL'):
         query = """
-            SELECT username, displayName, rank, cSnapsPercentRank, 
+            SELECT username, displayName, snapsPercentRank, cSnapsPercentRank, 
                    snapsPercent, cSnapsPercent, followers, 
-                   profileImageUrl, timestamp, timeframe 
+                   profileImageUrl, timestamp, timeframe, primaryLanguage 
             FROM snaps WHERE timestamp = ? AND timeframe = ?
         """
         with sqlite3.connect(self.db_path) as conn:
@@ -226,7 +232,7 @@ class DataProcessor:
 
     def get_user_history(self, username, timeframe='TOTAL'):
         query = """
-            SELECT displayName, timestamp , rank, cSnapsPercentRank, 
+            SELECT displayName, timestamp , snapsPercentRank, cSnapsPercentRank, 
                    snapsPercent, cSnapsPercent
             FROM snaps WHERE username = ? AND timeframe = ? ORDER BY timestamp ASC
         """
@@ -287,7 +293,7 @@ class DataProcessor:
             latest_ts = cursor.fetchone()[0]
             if not latest_ts: return self.get_user_info(username)
             query = """
-                SELECT username, displayName, rank, cSnapsPercentRank, 
+                SELECT username, displayName, snapsPercentRank, cSnapsPercentRank, 
                        snapsPercent, cSnapsPercent, followers, smartFollowers, 
                        profileImageUrl
                 FROM snaps WHERE username = ? AND timeframe = ? AND timestamp = ?
@@ -309,7 +315,7 @@ class DataProcessor:
     def compare_leaderboards(self, timestamp1, timestamp2, timeframe='TOTAL', metric='snapsPercent'):
         # 1. 컬럼 설정
         if metric == 'snapsPercent':
-            rank_col, ms_col, diff_col = 'rank', 'snapsPercent', 'mindshare_change'
+            rank_col, ms_col, diff_col = 'snapsPercentRank', 'snapsPercent', 'mindshare_change'
         else:
             rank_col, ms_col, diff_col = 'cSnapsPercentRank', 'cSnapsPercent', 'c_mindshare_change'
             
@@ -318,11 +324,21 @@ class DataProcessor:
         df2 = self.get_leaderboard_at_timestamp(timestamp2, timeframe)
         if df1.empty and df2.empty: return pd.DataFrame()
 
-        # 3. 데이터 전처리 (이름 변경)
-        df1 = df1[['username', 'displayName', rank_col, ms_col, 'profileImageUrl']].rename(columns={
+        # 3. 데이터 전처리 (이름 변경) - primaryLanguage 포함
+        # primaryLanguage가 있는지 확인하고 컬럼 목록 동적 생성
+        base_cols = ['username', 'displayName', rank_col, ms_col, 'profileImageUrl']
+        if 'primaryLanguage' in df1.columns:
+            base_cols.append('primaryLanguage')
+        
+        df1 = df1[base_cols].rename(columns={
             rank_col: 'prev_rank', ms_col: 'prev_mindshare', 'profileImageUrl': 'prev_profileImageUrl'
         })
-        df2 = df2[['username', 'displayName', rank_col, ms_col, 'profileImageUrl']].rename(columns={
+        
+        base_cols_df2 = ['username', 'displayName', rank_col, ms_col, 'profileImageUrl']
+        if 'primaryLanguage' in df2.columns:
+            base_cols_df2.append('primaryLanguage')
+        
+        df2 = df2[base_cols_df2].rename(columns={
             rank_col: 'curr_rank', ms_col: 'curr_mindshare', 'profileImageUrl': 'curr_profileImageUrl'
         })
         
@@ -331,8 +347,25 @@ class DataProcessor:
         compare_data['displayName'] = compare_data['displayName_curr'].combine_first(compare_data['displayName_prev']).fillna('')
         compare_data['profileImageUrl'] = compare_data['curr_profileImageUrl'].combine_first(compare_data['prev_profileImageUrl']).fillna('')
         
+        # primaryLanguage 처리 (curr 우선, 없으면 prev)
+        if 'primaryLanguage_curr' in compare_data.columns and 'primaryLanguage_prev' in compare_data.columns:
+            compare_data['primaryLanguage'] = compare_data['primaryLanguage_curr'].combine_first(compare_data['primaryLanguage_prev'])
+        elif 'primaryLanguage_curr' in compare_data.columns:
+            compare_data['primaryLanguage'] = compare_data['primaryLanguage_curr']
+        elif 'primaryLanguage_prev' in compare_data.columns:
+            compare_data['primaryLanguage'] = compare_data['primaryLanguage_prev']
+        elif 'primaryLanguage' in compare_data.columns:
+            # 이미 primaryLanguage 컬럼이 있으면 그대로 사용
+            pass
+        
         # 여기서 9999와 0으로 채움
         compare_data.fillna({'prev_mindshare': 0, 'curr_mindshare': 0, 'prev_rank': 9999, 'curr_rank': 9999}, inplace=True)
+        
+        # 🚨 rank와 mindshare 컬럼을 숫자형으로 변환 (DB에서 문자열로 저장된 경우 대비)
+        compare_data['prev_rank'] = pd.to_numeric(compare_data['prev_rank'], errors='coerce').fillna(9999)
+        compare_data['curr_rank'] = pd.to_numeric(compare_data['curr_rank'], errors='coerce').fillna(9999)
+        compare_data['prev_mindshare'] = pd.to_numeric(compare_data['prev_mindshare'], errors='coerce').fillna(0)
+        compare_data['curr_mindshare'] = pd.to_numeric(compare_data['curr_mindshare'], errors='coerce').fillna(0)
         
         # 5. 변동폭 계산
         compare_data['rank_change'] = compare_data['prev_rank'] - compare_data['curr_rank']
@@ -352,9 +385,15 @@ class DataProcessor:
         
         # --- [수정된 부분] 보정 로직 끝 ---
 
-        # 6. 결과 정리
-        result = compare_data[['username', 'displayName', 'profileImageUrl', 'prev_rank', 'curr_rank', 'rank_change', 
-                              'prev_mindshare', 'curr_mindshare', diff_col]].copy()
+        # 6. 결과 정리 - primaryLanguage 포함
+        result_cols = ['username', 'displayName', 'profileImageUrl', 'prev_rank', 'curr_rank', 'rank_change', 
+                      'prev_mindshare', 'curr_mindshare', diff_col]
+        
+        # primaryLanguage가 있으면 포함
+        if 'primaryLanguage' in compare_data.columns:
+            result_cols.append('primaryLanguage')
+        
+        result = compare_data[result_cols].copy()
         
         if metric == 'cSnapsPercent':
              result.rename(columns={'prev_mindshare': 'prev_c_mindshare', 'curr_mindshare': 'curr_c_mindshare'}, inplace=True)

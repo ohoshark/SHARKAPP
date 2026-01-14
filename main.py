@@ -81,7 +81,33 @@ def load_cookie_config():
     global COOKIE_CONFIG
     try:
         with open('./data/cookie/cookie_config.json', 'r', encoding='utf-8') as f:
-            COOKIE_CONFIG = json.load(f)
+            raw_config = json.load(f)
+        
+        # 언어 목록 정규화: "ko,es,pt" 같은 문자열을 ["ko", "es", "pt"]로 변환
+        def normalize_langs(lang_dict):
+            normalized = {}
+            for project, langs in lang_dict.items():
+                if isinstance(langs, list):
+                    # 리스트의 각 항목이 문자열이면 쉼표로 split
+                    expanded = []
+                    for item in langs:
+                        if isinstance(item, str) and ',' in item:
+                            expanded.extend([l.strip() for l in item.split(',')])
+                        else:
+                            expanded.append(item)
+                    normalized[project] = expanded
+                else:
+                    normalized[project] = langs
+            return normalized
+        
+        COOKIE_CONFIG = {
+            "snaps_reward_langs": normalize_langs(raw_config.get('snaps_reward_langs', {})),
+            "csnaps_reward_langs": normalize_langs(raw_config.get('csnaps_reward_langs', {})),
+            "default_snaps_exclude": raw_config.get('default_snaps_exclude', []),
+            "default_csnaps_exclude": raw_config.get('default_csnaps_exclude', []),
+            "ended_projects": raw_config.get('ended_projects', [])
+        }
+        
         print("[Cookie Config] Loaded successfully")
         print(f"  - snaps_reward_langs: {COOKIE_CONFIG.get('snaps_reward_langs', {})}")
         print(f"  - csnaps_reward_langs: {COOKIE_CONFIG.get('csnaps_reward_langs', {})}")
@@ -806,7 +832,7 @@ def update_global_rankings():
                         # 해당 타임스탬프의 모든 유저 데이터
                         cursor.execute('''
                             SELECT username, displayName, profileImageUrl, 
-                                   rank, cSnapsPercentRank, snapsPercent, cSnapsPercent,
+                                   snapsPercentRank, cSnapsPercentRank, snapsPercent, cSnapsPercent,
                                    followers, smartFollowers
                             FROM snaps 
                             WHERE timestamp = ? AND timeframe = ?
@@ -1461,6 +1487,32 @@ def api_user_data(username):
         
         # 🔥 Cookie 프로젝트 필터링 적용
         if 'cookie_projects' in data and data['cookie_projects']:
+            # 0단계: ended_projects 필터링 (전체 프로젝트 또는 특정 언어 제거)
+            ended_projects = COOKIE_CONFIG.get('ended_projects', [])
+            if ended_projects:
+                # ended_projects에 있는 프로젝트 제거
+                # - "tria": 모든 tria-* 제거 (tria-en, tria-ko 등)
+                # - "tria-ko": tria-ko만 제거, tria-en은 유지
+                filtered_projects = {}
+                for project_name, rankings in data['cookie_projects'].items():
+                    # 정확히 일치하는 경우 제거 (예: "tria-ko")
+                    if project_name in ended_projects:
+                        continue
+                    
+                    # 베이스 프로젝트 이름으로 전체 제거 (예: "tria")
+                    if '-' in project_name:
+                        base_project_name = project_name.rsplit('-', 1)[0]
+                        if base_project_name in ended_projects:
+                            continue
+                    else:
+                        # 언어 없는 프로젝트 (드물지만 처리)
+                        if project_name in ended_projects:
+                            continue
+                    
+                    filtered_projects[project_name] = rankings
+                
+                data['cookie_projects'] = filtered_projects
+            
             # 1단계: 사용자의 언어별 프로젝트 참여 정보 수집
             user_lang_projects = {}  # {base_project: [languages]}
             
@@ -1692,17 +1744,19 @@ def project_leaderboard(projectname):
                         lang_df = pd.read_sql(query, conn, params=usernames)
                         compare_data = compare_data.merge(lang_df, on='username', how='left')
                 
-                # 필터링: 제외해야 할 언어 제거
+                # 🚀 최적화: 제외할 언어 목록을 미리 계산하고 벡터화 연산 사용
                 if 'primaryLanguage' in compare_data.columns:
-                    original_count = len(compare_data)
-                    compare_data = compare_data[
-                        ~compare_data['primaryLanguage'].apply(
-                            lambda lang: should_exclude_lang(base_project_name, lang, metric)
-                        )
-                    ]
-                    filtered_count = original_count - len(compare_data)
-                    # if filtered_count > 0:
-                        # print(f"[Filter] {projectname} {metric}: {filtered_count} users excluded")
+                    # metric에 따라 제외할 언어 목록 가져오기
+                    if metric in ['snapsPercent', 'snaps']:
+                        exclude_langs = COOKIE_CONFIG.get('snaps_reward_langs', {}).get(base_project_name, [])
+                    elif metric in ['cSnapsPercent', 'cSnaps']:
+                        exclude_langs = COOKIE_CONFIG.get('csnaps_reward_langs', {}).get(base_project_name, [])
+                    else:
+                        exclude_langs = []
+                    
+                    # 벡터화 연산: isin()을 사용하여 한 번에 필터링 (1,706번 함수 호출 → 1번 연산)
+                    if exclude_langs:
+                        compare_data = compare_data[~compare_data['primaryLanguage'].isin(exclude_langs)]
         
         # 데이터 테이블을 HTML로 변환
         if not compare_data.empty:
@@ -1748,7 +1802,9 @@ def project_leaderboard(projectname):
                     </thead>
                     <tbody>
                 """
-            for i, row in enumerate(compare_data.itertuples(), 1):
+            
+            # 🚀 최적화: 루프 대신 벡터화 연산 + 리스트 컴프리헨션 사용
+            def generate_row_html(row):
                 prev_rank = row.prev_rank
                 curr_rank = row.curr_rank
                 prev_mindshare_value = getattr(row, prev_mindshare_col)
@@ -1782,7 +1838,7 @@ def project_leaderboard(projectname):
                     rank_change_html = '<span class="text-muted" data-order="0">-</span>'
                     mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
                 
-                table_html += f"""
+                return f"""
                     <tr>
                         <td>
                             <div class="d-flex align-items-center">
@@ -1799,8 +1855,11 @@ def project_leaderboard(projectname):
                         <td>{prev_mindshare_value:.4f}</td>
                         <td>{curr_mindshare_value:.4f}</td>
                         <td>{mindshare_change_html}</td>
-                    </tr>
-                    """
+                    </tr>"""
+            
+            # 리스트 컴프리헨션으로 한 번에 생성 후 join (훨씬 빠름)
+            rows_html = [generate_row_html(row) for row in compare_data.itertuples()]
+            table_html += ''.join(rows_html)
             
             table_html += """
                 </tbody>
@@ -1998,7 +2057,7 @@ def project_user_analysis(projectname,username):
                 mindshare_display_name = 'cMS'
                 rank_display_name = 'cRank' 
         else: # 기본값: snapsPercent
-            rank_col = 'rank'
+            rank_col = 'snapsPercentRank'
             mindshare_col = 'snapsPercent'
             if lang=='ko':
                 mindshare_display_name = '마인드쉐어'
@@ -2455,7 +2514,8 @@ def wallchain_leaderboard(projectname):
                     <tbody>
                 """
             
-            for i, row in enumerate(compare_data.itertuples(), 1):
+            # 🚀 최적화: 루프 대신 리스트 컴프리헨션 사용
+            def generate_wallchain_row_html(row):
                 prev_position = row.prev_position
                 curr_position = row.curr_position
                 
@@ -2487,7 +2547,7 @@ def wallchain_leaderboard(projectname):
                     position_change_html = '<span class="text-muted" data-order="0">-</span>'
                     mindshare_change_html = '<span class="text-muted" data-order="0">-</span>'
                 
-                table_html += f"""
+                return f"""
                     <tr>
                         <td>
                             <div class="d-flex align-items-center">
@@ -2504,8 +2564,11 @@ def wallchain_leaderboard(projectname):
                         <td>{row.prev_mindshare:.4f}</td>
                         <td>{row.curr_mindshare:.4f}</td>
                         <td>{mindshare_change_html}</td>
-                    </tr>
-                    """
+                    </tr>"""
+            
+            # 리스트 컴프리헨션으로 한 번에 생성 후 join
+            rows_html = [generate_wallchain_row_html(row) for row in compare_data.itertuples()]
+            table_html += ''.join(rows_html)
             
             table_html += """
                 </tbody>
@@ -2932,7 +2995,8 @@ def kaito_leaderboard_route(projectname):
                         <tbody>
                     """
                 
-                for row in df.itertuples():
+                # 🚀 최적화: 루프 대신 리스트 컴프리헨션 사용
+                def generate_kaito_row_html(row):
                     prev_rank = row.prev_rank
                     curr_rank = row.curr_rank
                     
@@ -2973,7 +3037,7 @@ def kaito_leaderboard_route(projectname):
                     image_url = f"/kaito-img/{row.imageId}" if row.imageId else ""
                     image_tag = f'<img src="{image_url}" alt="{row.displayName}" class="me-2" style="width:32px;height:32px;border-radius:50%;" onerror="this.style.display=\'none\'">' if image_url else ""
                     
-                    table_html += f"""
+                    return f"""
                         <tr>
                             <td>
                                 <div class="d-flex align-items-center">
@@ -2990,8 +3054,11 @@ def kaito_leaderboard_route(projectname):
                             <td>{row.prev_mindshare}</td>
                             <td>{row.curr_mindshare}</td>
                             <td>{ms_change_html}</td>
-                        </tr>
-                    """
+                        </tr>"""
+                
+                # 리스트 컴프리헨션으로 한 번에 생성 후 join
+                rows_html = [generate_kaito_row_html(row) for row in df.itertuples()]
+                table_html += ''.join(rows_html)
                 
                 table_html += """
                     </tbody>
