@@ -53,9 +53,9 @@ LOG_BUFFER_TIMEOUT = 5  # 5초마다 강제 저장
 LOG_LAST_FLUSH = time.time()
 LOG_LOCK = threading.Lock()
 
-# YAPS 캐시 (동일 사용자 5분간 캐시)
+# YAPS 캐시 (동일 사용자 2분간 캐시)
 YAPS_CACHE = {}  # {username: {'data': {...}, 'timestamp': time.time()}}
-YAPS_CACHE_DURATION = 300  # 5분 (초 단위)
+YAPS_CACHE_DURATION = 120  # 2분 (초 단위)
 
 # Kaito DB 쓰기 Lock (병렬 처리 시 동시 쓰기 방지)
 KAITO_DB_LOCK = threading.Lock()
