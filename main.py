@@ -3388,6 +3388,7 @@ def handle_404(error):
 from waitress import serve
                 
 if __name__ == '__main__':
+    # Infofi is dead
     # Ctrl+C 시그널 핸들러 등록
     def signal_handler(sig, frame):
         print("\n\n[시스템] 종료 신호 감지 (Ctrl+C)")
