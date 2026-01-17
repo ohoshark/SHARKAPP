@@ -1464,9 +1464,9 @@ def api_yaps(username):
     try:
         yaps_data = fetch_yaps_data(username)
         if yaps_data:
-            return json.dumps(yaps_data, ensure_ascii=False)
+            return json.dumps(yaps_data, ensure_ascii=False)   // YAPS 데이터 반환
         else:
-            return json.dumps({'error': 'YAPS data not available'}, ensure_ascii=False)
+            return json.dumps({'error': 'YAPS data not available'}, ensure_ascii=False) // YAPS 데이터 없음
     except Exception as e:
         print(f"[API Error] yaps: {e}")
         return json.dumps({'error': str(e)}, ensure_ascii=False)
